@@ -9,7 +9,7 @@ framework.
 ```
 .
 ├── Dockerfile                        # image definition
-├── Makefile                          # upstream clone + build / run helpers
+├── Makefile                          # build / run helpers
 ├── docker/
 │   ├── install.R                     # R package installation + verification
 │   ├── entrypoint.sh                 # container entrypoint
@@ -23,24 +23,18 @@ framework.
     └── data/                         # fixtures for the parser test
 ```
 
-MetaDAVis itself is **not vendored**. `make deps` shallow-clones the upstream
-repository into `MetaDAVis/` right before the build, `make refresh_deps` starts
-from a fresh checkout (use it to pick up an upstream update), and `make
-clean_deps` removes it again. The directory is in `.gitignore`, so nothing of
-the upstream repository ends up in this repository.
+MetaDAVis itself is **not vendored**. The Dockerfile shallow-clones the
+`galaxy-input` branch of the application fork while building the image.
 
 ```bash
-make deps                 # clone only
-make docker               # clone if needed, then build
-make refresh_deps docker  # fresh checkout, then build
-make re                   # clean_deps + docker from scratch
+make docker               # fetch the app and build the image
+make re                   # clean local containers, then rebuild
 ```
 
-Pin a different upstream state by overriding the make variables:
+Pin a different app state with Docker build arguments:
 
 ```bash
-make docker UPSTREAM_REF=v1.2.0     # a tag
-make docker UPSTREAM_REF=<sha>      # a specific commit
+docker build --build-arg APP_REF=v1.2.0 -t metadavis-gxit:latest .
 ```
 
 ## Build
@@ -55,7 +49,7 @@ README recommends and the app was written against. The Bioconductor stack
 (phyloseq, microbiome, ComplexHeatmap, scater, DESeq2, mia, ...) plus the two
 GitHub packages (microbiomeutilities, maaslin3) are compiled from source, so
 expect roughly **30-60 minutes** on a first build; afterwards Docker caches the
-layer and only the app copy is rebuilt.
+layer and only the app clone layer is rebuilt.
 
 `docker/install.R` verifies at the end of the build that every package can be
 *loaded*, not just installed, and fails the build if one is broken.
@@ -88,21 +82,16 @@ make check    # start a container and GET / on the published port
 compiled R stack and the Galaxy input staging on the example data shipped with
 MetaDAVis, without needing a browser.
 
-## Publish to Docker Hub
+## Publish
 
-```bash
-DOCKERHUB_PASSWORD=<token> USERNAME=<hub-user> make push_hub
-```
-
-This tags the image as `paulzierep/metadavis-gxit:1.0.0` and `:latest` (see the
-variables at the top of the Makefile), logs in with `docker login
---password-stdin`, pushes both tags and logs out again. The token is only read
-from the environment - do not put it into the repository.
+GitHub Actions publishes release images as
+`quay.io/paulzierep/metadavis-gxit:<tag>` and `:latest`. It uses the
+`QUAY_OAUTH_TOKEN` repository secret and Quay's `$oauthtoken` username.
 
 ## Register it in Galaxy
 
 1. Build the image locally, then tag it with the name the tool XML asks for
-   (`paulzierep/metadavis-gxit:latest`). `make docker` does both.
+   (`quay.io/paulzierep/metadavis-gxit:latest`). `make docker` does both.
 2. Copy `gxit/interactivetool_metadavis.xml` into Galaxy's `tools/interactive/`
    directory.
 3. Make sure interactive tools are enabled, e.g. in `config/galaxy.yml`:

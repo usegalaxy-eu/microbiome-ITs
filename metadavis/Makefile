@@ -15,7 +15,7 @@ UPSTREAM_SENTINEL=$(UPSTREAM_DIR)/scripts/MaAsLin3.R
 # Galaxy pulls the old published image from the registry instead of using the
 # image you just built locally.
 docker_name=metadavis-gxit
-docker_repo=paulzierep
+docker_repo=quay.io/paulzierep
 # Must match <port> in gxit/interactivetool_metadavis.xml and ARG PORT in the
 # Dockerfile.
 internal_port=8080
@@ -27,7 +27,7 @@ WEB_TAG=1.0.0
 WEB_TARGET=${docker_repo}/${docker_name}:${WEB_TAG}
 WEB_LATEST=${docker_repo}/${docker_name}:latest
 
-re:clean clean_deps docker
+re:clean docker
 
 # Shallow clone of the upstream app, checked in as a build input only. Written
 # as a .PHONY target rather than a file target so that a half-deleted or stale
@@ -76,7 +76,7 @@ hub_logout:
 docker_logout:
 	docker logout
 
-docker: deps
+docker:
 	@docker build --build-arg PORT=${internal_port} -t $(docker_name):latest .
 	@docker tag $(docker_name):latest ${WEB_TARGET}
 	@docker tag $(docker_name):latest ${WEB_LATEST}

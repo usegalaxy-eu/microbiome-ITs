@@ -28,10 +28,12 @@ APP_SOURCE="${METADAVIS_APP_SOURCE:-/opt/MetaDAVis}"
 JOB_DIR="${METADAVIS_JOB_DIR:-$PWD}"
 PORT="${PORT:-8080}"
 INPUT_DIR="$JOB_DIR/metadavis_inputs"
+OUTPUT_DIR="${METADAVIS_OUTPUT_DIR:-$JOB_DIR/metadavis_outputs}"
 APP_DIR="$JOB_DIR/app"
 STARTUP_LOG="$JOB_DIR/metadavis_startup.txt"
 
-mkdir -p "$INPUT_DIR"
+mkdir -p "$INPUT_DIR" "$OUTPUT_DIR"
+export METADAVIS_OUTPUT_DIR="$OUTPUT_DIR"
 
 # Galaxy datasets have no meaningful file extension, so the staged copies keep
 # the plain names above and the application detects the separator from the
@@ -65,6 +67,15 @@ staged_report() {
     echo "MetaDAVis Galaxy Interactive Tool"
     echo "started:   $(date --iso-8601=seconds)"
     echo "port:      $PORT"
+    echo "Galaxy URL: ${GALAXY_URL:-<not set>}"
+    echo "Galaxy callback port: ${GALAXY_WEB_PORT:-<not set>}"
+    echo "Galaxy history: ${HISTORY_ID:-<not set>}"
+    if [ -n "${API_KEY:-}" ]; then
+        echo "Galaxy API key: present"
+    else
+        echo "Galaxy API key: missing"
+    fi
+    echo "output directory: $OUTPUT_DIR"
     echo
     staged_report "$INPUT_DIR/otu" "OTU table: "
     staged_report "$INPUT_DIR/taxonomy" "taxonomy:   "

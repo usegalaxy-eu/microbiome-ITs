@@ -8,20 +8,19 @@ build, run and register it:
 
 | Directory | Upstream | Container image |
 | --- | --- | --- |
-| [`metadavis/`](metadavis/) | [GudaLab/MetaDAVis](https://github.com/GudaLab/MetaDAVis) | `paulzierep/metadavis-gxit` |
-| [`microbiomeprofiler/`](microbiomeprofiler/) | [yulab-smu/microbiomeprofiler](https://github.com/yulab-smu/microbiomeprofiler) | `paulzierep/microbiomeprofiler-gxit` |
+| [`metadavis/`](metadavis/) | [paulzierep/MetaDAVis](https://github.com/paulzierep/MetaDAVis/tree/galaxy-input) | `quay.io/paulzierep/metadavis-gxit` |
+| [`microbiomeprofiler/`](microbiomeprofiler/) | [yulab-smu/microbiomeprofiler](https://github.com/yulab-smu/microbiomeprofiler) | `quay.io/paulzierep/microbiomeprofiler-gxit` |
 
 ## Quick start
 
 ```bash
 cd metadavis           # or: cd microbiomeprofiler
-make deps              # shallow-clone the upstream repository
 make docker            # build + tag the image
 ```
 
-The upstream repositories are **not vendored**. Each `Makefile` clones its
-upstream into its own subdirectory on demand, and the subdirectory is listed in
-`.gitignore`:
+The upstream repositories are **not vendored**. Each Dockerfile shallow-clones
+its application source while the image is built. For local inspection, the
+Makefiles can also create ignored checkouts:
 
 ```bash
 make refresh_deps      # re-clone, to pick up an upstream update
@@ -67,7 +66,23 @@ planemo serve --host 0.0.0.0 --port 8080 <tool>/gxit/
 
 ## Registry
 
-Images are pushed to Docker Hub under the `paulzierep` account:
+Release images are pushed by GitHub Actions to Quay.io under the `paulzierep`
+organization. The release workflow authenticates with the repository's
+`QUAY_OAUTH_TOKEN` secret.
+
+Changes under one tool directory build only that image. Connected app
+repositories can request a release build with a `repository_dispatch` event:
+
+```json
+{"event_type":"image-release","client_payload":{"image":"metadavis","tag":"1.0.0"}}
+```
+
+Use `microbiomeprofiler` as `image` for that container. Sending this event from
+another repository requires a token with permission to dispatch workflows in
+this repository. The workflow can also be started manually with the same image
+and tag inputs.
+
+Docker Hub helpers remain available for manual publishing:
 
 ```bash
 make push_hub USERNAME=paulzierep DOCKERHUB_PASSWORD=...

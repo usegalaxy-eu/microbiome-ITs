@@ -201,7 +201,7 @@ install_missing(cran_packages, "CRAN", function(pkgs) {
 cat(sprintf("\n== installing MicrobiomeProfiler from %s\n", app_source))
 if (!file.exists(file.path(app_source, "DESCRIPTION"))) {
     stop(sprintf(
-        "no DESCRIPTION in %s - run `make deps` first, or point the build at a checkout",
+        "no DESCRIPTION in %s - check APP_REPOSITORY and APP_REF",
         app_source
     ))
 }

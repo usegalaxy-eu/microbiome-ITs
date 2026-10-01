@@ -35,16 +35,15 @@ tables) work offline; only the enrichment lookups need the network.
 ```
 .
 ├── Dockerfile
-├── Makefile                          # upstream clone + build / run helpers
+├── Makefile                          # build / run helpers
 ├── docker/
 │   └── install.R                     # dependency install + app verification
 └── gxit/
     └── interactivetool_microbiomeprofiler.xml
 ```
 
-The upstream repository is **not vendored**: `make deps` shallow-clones it into
-`MicrobiomeProfiler/`, `make refresh_deps` starts from a fresh checkout, `make
-clean_deps` removes it. The directory is in `.gitignore`.
+The upstream repository is **not vendored**. The Dockerfile shallow-clones its
+`devel` branch while building the image.
 
 ## Build
 
@@ -58,7 +57,7 @@ requirement and matches the clusterProfiler versions the package was developed
 against. Most dependencies are CRAN, so the build is considerably faster than
 the MetaDAVis one - expect roughly 15-30 minutes on a first build.
 
-The package is installed with `remotes::install_github()`, and `install.R` then
+The cloned package is installed from source, and `install.R` then
 verifies that `MicrobiomeProfiler::run_MicrobiomeProfiler()` returns a working
 Shiny app object and that the packaged data files are in place. A build that
 produces an unloadable app fails instead of shipping.
@@ -73,7 +72,7 @@ make stop
 
 ## Register it in Galaxy
 
-1. `make docker` (builds and tags `paulzierep/microbiomeprofiler-gxit:latest`).
+1. `make docker` (builds and tags `quay.io/paulzierep/microbiomeprofiler-gxit:latest`).
 2. Copy `gxit/interactivetool_microbiomeprofiler.xml` into Galaxy's
    `tools/interactive/` directory.
 3. Enable interactive tools in `config/galaxy.yml`:

@@ -1,7 +1,7 @@
 <tool id="interactive_tool_microbiomeprofiler" tool_type="interactive" name="MicrobiomeProfiler" version="1.0.0">
     <description>Interactive functional enrichment analysis of microbiome data</description>
     <requirements>
-        <container type="docker">paulzierep/microbiomeprofiler-gxit:latest</container>
+        <container type="docker">quay.io/paulzierep/microbiomeprofiler-gxit:latest</container>
     </requirements>
     <entry_points>
         <entry_point name="MicrobiomeProfiler" requires_domain="True">

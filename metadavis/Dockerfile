@@ -43,6 +43,7 @@ RUN apt-get update \
         fonts-texgyre \
         ca-certificates \
         curl \
+        git \
         net-tools \
     && rm -rf /var/lib/apt/lists/*
 
@@ -84,11 +85,13 @@ RUN set -eux; \
     fi
 ENV CHROMOTE_CHROME=/usr/bin/google-chrome
 
-# The application. The Galaxy input format ("galaxy" in the UI, parsed as the
-# phyloseq three-file layout) lives in the app itself, so nothing has to be
-# spliced into server.R at build time.
-COPY MetaDAVis/ /opt/MetaDAVis/
-RUN rm -rf /opt/MetaDAVis/.git
+# The application is fetched while building rather than vendored in this
+# packaging repository. The fork's branch contains the Galaxy input and output
+# integration.
+ARG APP_REPOSITORY=https://github.com/paulzierep/MetaDAVis.git
+ARG APP_REF=galaxy-input
+RUN git clone --depth 1 --branch "$APP_REF" "$APP_REPOSITORY" /opt/MetaDAVis \
+    && rm -rf /opt/MetaDAVis/.git
 
 # The port the app listens on. It has to match <port> in the tool XML, because
 # Galaxy publishes exactly that container port for the interactive tool entry

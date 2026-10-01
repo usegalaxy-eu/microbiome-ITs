@@ -33,18 +33,19 @@ RUN apt-get update \
         fonts-texgyre \
         ca-certificates \
         curl \
+        git \
     && rm -rf /var/lib/apt/lists/*
 
-# The upstream checkout is a build input rather than a vendored dependency:
-# `make deps` clones it and install.R installs it with remotes::install_local().
-# ARG keeps the location overridable, so the image can be rebuilt from another
-# checkout without editing docker/install.R.
+# Fetch the application while building rather than vendoring it in this
+# packaging repository. ARGs keep the source overridable for development builds.
 ARG APP_SOURCE=/opt/src/MicrobiomeProfiler
-COPY MicrobiomeProfiler/ $APP_SOURCE/
+ARG APP_REPOSITORY=https://github.com/yulab-smu/microbiomeprofiler.git
+ARG APP_REF=devel
+RUN git clone --depth 1 --branch "$APP_REF" "$APP_REPOSITORY" "$APP_SOURCE" \
+    && rm -rf "$APP_SOURCE/.git"
 
-# Dependencies and the package itself in one layer, so that a change to the app
-# source does not invalidate the (long) package build layer. The source tree is
-# dropped afterwards: the app runs from the installed library.
+# Dependencies and the package itself are installed together. The source tree
+# is dropped afterwards because the app runs from the installed library.
 # (install.R is copied to /tmp rather than run as docker/install.R because the
 # image's working directory is /, not the build context.)
 ENV MICROBIOMEPROFILER_SOURCE=$APP_SOURCE

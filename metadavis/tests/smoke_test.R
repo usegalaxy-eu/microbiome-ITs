@@ -160,6 +160,48 @@ if (inherits(staged, "error")) {
 }
 
 # --------------------------------------------------------------------------
+# 6. Galaxy uploads use the installed put command with its supported arguments
+# --------------------------------------------------------------------------
+source(file.path("scripts", "galaxy_downloads.R"), local = TRUE)
+fake_put <- tempfile("metadavis-put-")
+put_args <- tempfile("metadavis-put-args-")
+writeLines(c("#!/bin/sh", "printf '%s\\n' \"$@\" > \"$METADAVIS_PUT_ARGS\""), fake_put)
+Sys.chmod(fake_put, mode = "0755")
+upload_file <- tempfile(fileext = ".txt")
+writeLines("test", upload_file)
+output_dir <- tempfile("metadavis-outputs-")
+Sys.setenv(
+    METADAVIS_GALAXY_PUT = fake_put,
+    METADAVIS_PUT_ARGS = put_args,
+    METADAVIS_OUTPUT_DIR = output_dir,
+    HISTORY_ID = "history-id",
+    API_KEY = "test-key"
+)
+upload <- metadavis_send_to_galaxy(upload_file, "test.txt", "txt")
+expected_args <- c("-p", upload_file, "-t", "txt", "--history-id", "history-id")
+report(isTRUE(upload$ok) && identical(readLines(put_args), expected_args),
+       "Galaxy upload invokes the put console command")
+upload_log <- file.path(output_dir, "galaxy_upload.log")
+log_text <- paste(readLines(upload_log), collapse = "\n")
+report(file.exists(upload_log) &&
+       grepl("upload start", log_text, fixed = TRUE) &&
+       grepl("exit_status=0", log_text, fixed = TRUE) &&
+       !grepl("test-key", log_text, fixed = TRUE),
+       "Galaxy upload writes a sanitized diagnostic log")
+unlink(put_args)
+started <- Sys.time()
+metadavis_send_to_galaxy_async(upload_file, "test.txt", "txt")
+for (i in seq_len(50L)) {
+    if (file.exists(put_args)) break
+    Sys.sleep(0.1)
+}
+report(as.numeric(difftime(Sys.time(), started, units = "secs")) < 5 && file.exists(put_args),
+       "Galaxy upload can run without blocking Shiny")
+output_path <- metadavis_galaxy_output_path("result table.tsv")
+report(identical(output_path, file.path(output_dir, "result table.tsv")) && dir.exists(output_dir),
+       "Galaxy output path uses the discovered output directory")
+
+# --------------------------------------------------------------------------
 if (length(failures)) {
     cat(sprintf("\n%d check(s) FAILED: %s\n", length(failures), paste(failures, collapse = "; ")))
     quit(status = 1L)

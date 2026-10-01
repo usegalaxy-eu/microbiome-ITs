@@ -1,0 +1,105 @@
+name: Container images
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ci.yml'
+      - 'metadavis/**'
+      - 'microbiomeprofiler/**'
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/ci.yml'
+      - 'metadavis/**'
+      - 'microbiomeprofiler/**'
+  release:
+    types:
+      - published
+  repository_dispatch:
+    types:
+      - image-release
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Image to publish
+        required: true
+        type: choice
+        options:
+          - metadavis
+          - microbiomeprofiler
+      tag:
+        description: Quay tag
+        required: true
+        default: latest
+        type: string
+
+env:
+  IMAGE_REGISTRY: quay.io
+
+jobs:
+  changes:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      metadavis: ${{ steps.filter.outputs.metadavis }}
+      microbiomeprofiler: ${{ steps.filter.outputs.microbiomeprofiler }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect changed images
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            metadavis:
+              - '.github/workflows/ci.yml'
+              - 'metadavis/**'
+            microbiomeprofiler:
+              - '.github/workflows/ci.yml'
+              - 'microbiomeprofiler/**'
+
+  build-metadavis:
+    needs: changes
+    if: needs.changes.outputs.metadavis == 'true'
+    uses: ./.github/workflows/image.yml
+    with:
+      context: metadavis
+      image: metadavis-gxit
+      push: false
+
+  build-microbiomeprofiler:
+    needs: changes
+    if: needs.changes.outputs.microbiomeprofiler == 'true'
+    uses: ./.github/workflows/image.yml
+    with:
+      context: microbiomeprofiler
+      image: microbiomeprofiler-gxit
+      push: false
+
+  release-metadavis:
+    if: >-
+      github.event_name == 'release' ||
+      (github.event_name == 'repository_dispatch' && github.event.client_payload.image == 'metadavis') ||
+      (github.event_name == 'workflow_dispatch' && inputs.image == 'metadavis')
+    uses: ./.github/workflows/image.yml
+    with:
+      context: metadavis
+      image: metadavis-gxit
+      push: true
+      tag: ${{ github.event.client_payload.tag || inputs.tag || github.event.release.tag_name }}
+    secrets: inherit
+
+  release-microbiomeprofiler:
+    if: >-
+      github.event_name == 'release' ||
+      (github.event_name == 'repository_dispatch' && github.event.client_payload.image == 'microbiomeprofiler') ||
+      (github.event_name == 'workflow_dispatch' && inputs.image == 'microbiomeprofiler')
+    uses: ./.github/workflows/image.yml
+    with:
+      context: microbiomeprofiler
+      image: microbiomeprofiler-gxit
+      push: true
+      tag: ${{ github.event.client_payload.tag || inputs.tag || github.event.release.tag_name }}
+    secrets: inherit
