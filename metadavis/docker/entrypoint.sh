@@ -9,10 +9,16 @@
 # instead of being served from /opt/MetaDAVis.
 #
 # The three datasets the tool was given are staged by its <command> as
-# metadavis_inputs/{otu,taxonomy,metadata}. Only their paths are handed to the
-# application, as environment variables - the input format is fixed, the field
+# metadavis_inputs/{otu,taxonomy,metadata}, and their paths are handed to the
+# application as environment variables - the input format is fixed, the field
 # separator is detected from each file header and the taxonomic level is chosen
 # inside the application.
+#
+# Reducing a wide metadata table to the sample ids and the grouping condition is
+# the tool's job, not the container's: metadavis-trim-metadata does it in the
+# <command> and replaces metadavis_inputs/metadata with the result, so all that is
+# left here is to hand the staged path to the application and report what the tool
+# did (metadavis_trim.txt, written by the same tool).
 #
 # For a plain `docker run` the same script works, see the README.
 
@@ -30,16 +36,28 @@ mkdir -p "$INPUT_DIR"
 # Galaxy datasets have no meaningful file extension, so the staged copies keep
 # the plain names above and the application detects the separator from the
 # header line instead.
-export METADAVIS_OTU_TABLE="$INPUT_DIR/otu"
-export METADAVIS_TAXONOMY_TABLE="$INPUT_DIR/taxonomy"
-export METADAVIS_METADATA_FILE="$INPUT_DIR/metadata"
+# Only export the datasets that were actually staged. A Galaxy job may carry
+# none of them - the tool inputs are optional - and the application falls back to
+# the browser upload or the example data in that case.
+export_path() {
+    local var="$1" path="$2"
+    if [ -s "$path" ]; then
+        export "$var=$path"
+    else
+        unset "$var" || true
+    fi
+}
+
+export_path METADAVIS_OTU_TABLE "$INPUT_DIR/otu"
+export_path METADAVIS_TAXONOMY_TABLE "$INPUT_DIR/taxonomy"
+export_path METADAVIS_METADATA_FILE "$INPUT_DIR/metadata"
 
 staged_report() {
     local path="$1" label="$2"
     if [ -s "$path" ]; then
-        echo "$label:     $path ($(wc -c < "$path") bytes)"
+        echo "$label $path ($(wc -c < "$path") bytes)"
     else
-        echo "$label: <not staged, upload in the browser>"
+        echo "$label <not provided, upload in the browser>"
     fi
 }
 
@@ -48,9 +66,13 @@ staged_report() {
     echo "started:   $(date --iso-8601=seconds)"
     echo "port:      $PORT"
     echo
-    staged_report "$METADAVIS_OTU_TABLE" "OTU table"
-    staged_report "$METADAVIS_TAXONOMY_TABLE" "taxonomy"
-    staged_report "$METADAVIS_METADATA_FILE" "metadata"
+    staged_report "$INPUT_DIR/otu" "OTU table: "
+    staged_report "$INPUT_DIR/taxonomy" "taxonomy:   "
+    staged_report "$INPUT_DIR/metadata" "metadata:   "
+    if [ -s "$JOB_DIR/metadavis_trim.txt" ]; then
+        echo "metadata:   $(cat "$JOB_DIR/metadavis_trim.txt")"
+        echo "columns:    $(head -n 1 "$INPUT_DIR/metadata")"
+    fi
     echo
     echo "R session:"
     Rscript --vanilla -e 'cat(paste(utils::capture.output(sessionInfo()), collapse = "\n"), "\n")'

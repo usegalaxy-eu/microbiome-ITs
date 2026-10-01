@@ -8,26 +8,50 @@
             <port>8080</port>
         </entry_point>
     </entry_points>
-    <!-- The container's entrypoint stages the three datasets, hands their paths
-         to the application through environment variables, copies the app into
-         the job directory and starts shiny on the port above, which is the port
-         Galaxy publishes for the entry point. No <environment_variables> are
-         needed: the port is already the image default and the field separators
-         are detected from the file headers. -->
+    <!-- Environment variables galaxy_ie_helpers needs to talk back to the API:
+         the history the interactive session belongs to, the URL to reach the
+         Galaxy instance on, and a key that is allowed to write into it. The
+         container reaches Galaxy through the docker bridge, so GALAXY_URL is
+         also offered with $DOCKER_HOST substituted in, and GALAXY_WEB_PORT is
+         the port to try when that fails. -->
+    <environment_variables>
+        <environment_variable name="HISTORY_ID">$__history_id__</environment_variable>
+        <environment_variable name="GALAXY_URL">$__galaxy_url__</environment_variable>
+        <environment_variable name="GALAXY_WEB_PORT">8080</environment_variable>
+        <environment_variable name="REMOTE_HOST">$__galaxy_url__</environment_variable>
+        <environment_variable name="API_KEY" inject="api_key"/>
+    </environment_variables>
+    <!-- The metadata table is reduced here, before the container sees it: the
+         application only ever works with two metadata columns (the sample ids
+         and the grouping condition), so the column picked above is kept and the
+         rest of a wide table is dropped. A column that cannot be resolved is not
+         fatal - the staged table is used as it is, and the application reports
+         the problem in its own words. -->
     <command detect_errors="exit_code"><![CDATA[
         mkdir -p metadavis_inputs ;
+#if $otu_table
         cp -f '$otu_table' metadavis_inputs/otu ;
+#end if
+#if $taxonomy_table
         cp -f '$taxonomy_table' metadavis_inputs/taxonomy ;
+#end if
+#if $metadata_table
         cp -f '$metadata_table' metadavis_inputs/metadata ;
+        rm -f metadavis_inputs/metadata_trimmed metadavis_trim.txt ;
+        METADAVIS_TRIM_NOTE_FILE=metadavis_trim.txt metadavis-trim-metadata metadavis_inputs/metadata '$condition_column' metadavis_inputs/metadata_trimmed &&
+        ln -sf metadata_trimmed metadavis_inputs/metadata || true ;
+#end if
         exec /usr/local/bin/metadavis-entrypoint
     ]]></command>
     <inputs>
-        <param name="otu_table" type="data" format="tabular,csv" label="OTU / feature table"
+        <param name="otu_table" type="data" format="tabular,csv" optional="true" label="OTU / feature table (optional)"
             help="Feature count table in phyloseq layout: features (OTUs, ASVs or other features) in the rows, the first column holding the feature id, and one column per sample. Tab or comma separated, the separator is detected from the header."/>
-        <param name="taxonomy_table" type="data" format="tabular,csv" label="Taxonomy table"
+        <param name="taxonomy_table" type="data" format="tabular,csv" optional="true" label="Taxonomy table (optional)"
             help="Taxonomy assignment for the features of the OTU table: features in the rows, the first column holding the same feature ids, and one column per taxonomic rank (Kingdom to Species). Rank prefixes such as d__ or p__ are stripped. Features missing from this table are reported as Unclassified."/>
-        <param name="metadata_table" type="data" format="tabular,csv" label="Sample metadata"
-            help="Sample annotations: the first column holds the sample ids, which have to match the sample columns of the OTU table, the second column the condition/group used for comparisons. Further annotation columns are kept and shown."/>
+        <param name="metadata_table" type="data" format="tabular,csv" optional="true" label="Sample metadata (optional)"
+            help="Sample annotations: the first column holds the sample ids, which have to match the sample columns of the OTU table. The column picked below is used as the condition/group for the comparisons."/>
+        <param name="condition_column" use_header_names="true" type="data_column" data_ref="metadata_table" optional="true" label="Grouping condition column (optional)"
+            help="Column of the sample metadata holding the grouping condition. Samples are grouped by this column in all comparisons. The application only ever works with two metadata columns, the sample ids and this one, so the table is reduced to those before the analysis: any further annotation columns are dropped. Pick the second column if your metadata is the usual sample id plus condition layout; leaving this empty does the same."/>
     </inputs>
     <outputs>
         <data name="startup_log" format="txt" from_work_dir="metadavis_startup.txt"
@@ -42,16 +66,19 @@ results from kingdom to species level.
 
 .. class:: infomark
 
-**Results are downloaded from the browser.** Every table and plot has a download
-button, and the *Run* tab offers a bulk download of all analyses you have
-completed during the session as a single ZIP archive.
+**Results are sent to your Galaxy history.** Every table and plot has a
+*Send to Galaxy* button next to its download button, which puts the file into
+the history of this session, where the next tool can use it. The *Run* tab
+offers a bulk download of all analyses you have completed during the session as
+a single ZIP archive, which can be sent the same way.
 
 **Input datasets.** The three tables you select here are staged and pre-loaded
 into the application as the *Galaxy input* format in the *Upload files* tab. Open
-the tool, choose *Galaxy input* and press *Submit* to analyse them. The
-taxonomic level to display and all other options are set inside the application.
-You can also ignore the pre-loaded data and upload your own files from within
-the browser, or use the built-in example data.
+the tool, choose *Galaxy input* and press *Submit* to analyse them. Use *Grouping
+condition column* to say which column of the metadata table holds the condition
+the samples are grouped by; the taxonomic level to display and all other options
+are set inside the application. You can also ignore the pre-loaded data and
+upload your own files from within the browser, or use the built-in example data.
 
 What this tool provides:
 

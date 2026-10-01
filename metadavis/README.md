@@ -12,12 +12,14 @@ framework.
 ├── Makefile                          # upstream clone + build / run helpers
 ├── docker/
 │   ├── install.R                     # R package installation + verification
-│   └── entrypoint.sh                 # container entrypoint
+│   ├── entrypoint.sh                 # container entrypoint
+│   └── trim_metadata.py              # metadata reduction, run by the tool
 ├── gxit/
 │   └── interactivetool_metadavis.xml # Galaxy interactive tool
 └── tests/
     ├── smoke_test.R                  # headless check of the built image
     ├── phyloseq_test.R               # parser test for the Galaxy input format
+    ├── trim_metadata_test.sh          # the metadata reduction
     └── data/                         # fixtures for the parser test
 ```
 
@@ -161,6 +163,27 @@ column per rank, and a **sample metadata** table with the sample ids in the firs
 column and the condition/group in the second. Select *Galaxy input* and press
 *Submit* to load them.
 
+The application can only work with two metadata columns - the sample ids and the
+grouping condition - because that is what every plot reads: the second column of
+the metadata table. A wider metadata table is therefore reduced to those two
+columns, using the one picked in *Grouping condition column*, before the
+container is started:
+
+- `docker/trim_metadata.py` (installed as `metadavis-trim-metadata`) is called
+  by the tool's `<command>`. It writes `metadavis_inputs/metadata_trimmed`
+  (sample ids plus the selected column) and the `<command>` points
+  `metadavis_inputs/metadata` at it, so the file the application reads already
+  is the layout it expects. It parses the table with the `csv` module, so quoted
+  fields - a sample called `Clinic, Main`, or a whole quoted CSV - survive the
+  reduction. A column that cannot be resolved (a name that is not in the table, a
+  number out of range, the sample id column) is not fatal: the staged table is
+  used as it was, and the application reports the problem in its own words. Both
+  outcomes are reported in `metadavis_startup.txt`.
+
+The application itself is left as close to upstream as possible: the only change
+is the *Galaxy input* format, which reads the three staged tables. Which column
+is the condition is decided by the tool form, not by the application.
+
 This is implemented in the app itself (`scripts/data_input.R`, `server.R`,
 `ui.R`) rather than by patching the image build, so the format is part of the
 fork and nothing has to be spliced into `server.R` at image build time.
@@ -180,9 +203,23 @@ label is invisible in the taxonomy table and in plot labels.
 
 ## Results
 
-The application is result-export oriented: every table and plot has a download
-button, and the *Run* tab bundles all completed analyses into one ZIP. Those
-downloads go through the browser, not through Galaxy.
+Every table and plot has a download button, and the *Run* tab bundles all
+completed analyses into one ZIP. Inside Galaxy each of those buttons has a
+*Send to Galaxy* companion that puts the same file into the history of the
+running session, so a result can be handed to the next tool without leaving the
+browser.
+
+The upload is `galaxy_ie_helpers` (`put()`), which the tool XML feeds with
+`HISTORY_ID`, `GALAXY_URL`, `GALAXY_WEB_PORT` and an `API_KEY` injected from the
+user's session. The helper runs in its own virtualenv (`/opt/galaxy_ie_helpers`)
+because Ubuntu marks the system python as externally managed, and `net-tools` is
+installed because the helper finds the docker bridge address with `netstat`.
+
+The application side is one small file, `scripts/galaxy_downloads.R`: every
+`downloadHandler` is wrapped so the file name and content function are
+registered, and one piece of javascript adds the button next to each download
+link shiny renders. Nothing about a download changes - the button produces the
+very same file the download button would.
 
 The one result that lands on disk is the MaAsLin3 output directory
 (`app/www/hmp2_output` plus `app/www/hmp2_output.zip`), because the app writes it

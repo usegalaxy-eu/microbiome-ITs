@@ -43,7 +43,26 @@ RUN apt-get update \
         fonts-texgyre \
         ca-certificates \
         curl \
+        net-tools \
     && rm -rf /var/lib/apt/lists/*
+
+# Python helper for talking back to the Galaxy API.
+#
+# galaxy_ie_helpers (https://github.com/bgruening/galaxy_ie_helpers) is what
+# pushes a downloaded table or plot into the history of the running interactive
+# session. It goes into its own virtual environment rather than into the system
+# python, because Ubuntu marks that one as externally managed (PEP 668) and
+# because the R stack of this image must not be able to reach it by accident.
+#
+# net-tools, installed above, is not optional: galaxy_ie_helpers determines the
+# docker bridge address of its container with `netstat -nr`, so without it
+# every upload would fail with a FileNotFoundError.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3-venv \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -m venv /opt/galaxy_ie_helpers \
+    && /opt/galaxy_ie_helpers/bin/pip install --no-cache-dir galaxy-ie-helpers \
+    && /opt/galaxy_ie_helpers/bin/python -c "import galaxy_ie_helpers"
 
 # Install the R dependencies before copying the app so that editing the app does
 # not invalidate the (long) package build layer.
@@ -81,6 +100,11 @@ EXPOSE $PORT
 
 COPY docker/entrypoint.sh /usr/local/bin/metadavis-entrypoint
 RUN chmod 0755 /usr/local/bin/metadavis-entrypoint
+
+# Reduces a wide metadata table to the sample ids plus the grouping condition,
+# called by the tool's <command> before this container is started.
+COPY docker/trim_metadata.py /usr/local/bin/metadavis-trim-metadata
+RUN chmod 0755 /usr/local/bin/metadavis-trim-metadata
 
 # CMD, not ENTRYPOINT: Galaxy overrides the command of an interactive tool job
 # with the tool's own <command>, which has to reach the shell untouched.

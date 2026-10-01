@@ -1,7 +1,7 @@
-SampleID	Condition	Site
-S1	Healthy	North
-S2	Healthy	North
-S3	Disease	South
-S4	Disease	South
-S5	Healthy	East
-S6	Disease	East
+SampleID	Condition
+S1	Healthy
+S2	Healthy
+S3	Disease
+S4	Disease
+S5	Healthy
+S6	Disease

@@ -93,11 +93,21 @@ d:
 smoke:
 	docker run --rm -v "$(CURDIR)/tests:/tests:ro" --entrypoint Rscript $(docker_name):latest /tests/smoke_test.R
 
+# metadata reduction done by the tool's <command>: bash and the system python3,
+# no image needed
+test-trim:
+	@bash tests/trim_metadata_test.sh
+
 # focused test of the phyloseq (OTU + taxonomy + metadata) input path, without
-# booting the Shiny app
+# booting the Shiny app. /docker carries the trimmer the tool runs, so the test
+# can check that what the tool hands over is what the parser accepts.
 test-phyloseq:
 	docker run --rm -v "$(CURDIR)/MetaDAVis:/app:ro" -v "$(CURDIR)/tests:/tests:ro" \
+	    -v "$(CURDIR)/docker:/docker:ro" \
 	    --entrypoint Rscript $(docker_name):latest --vanilla /tests/phyloseq_test.R /tests/data
+
+# everything that can be checked without starting the app
+test-fast: test-trim test-phyloseq
 
 # is the app actually answering on the published port?
 # Polled rather than slept on: loading ~40 R packages plus patching server.R
@@ -134,4 +144,4 @@ clean:
 	docker container prune
 	docker rmi $(docker_name):latest || true
 
-.PHONY: deps refresh_deps clean_deps docker it d smoke test-phyloseq check sh log stop clean push_hub do_push hub_login remove_hub_credentials hub_logout docker_logout
+.PHONY: deps refresh_deps clean_deps docker it d smoke test-trim test-phyloseq test-fast check sh log stop clean push_hub do_push hub_login remove_hub_credentials hub_logout docker_logout
