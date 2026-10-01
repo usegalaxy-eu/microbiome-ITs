@@ -2,7 +2,7 @@ FROM rocker/shiny-verse:4.4.3
 
 LABEL org.opencontainers.image.title="MicrobiomeProfiler" \
       org.opencontainers.image.description="MicrobiomeProfiler R package and Shiny app, packaged for the Galaxy Interactive Tools framework" \
-      org.opencontainers.image.source="https://github.com/yulab-smu/microbiomeprofiler" \
+      org.opencontainers.image.source="https://github.com/paulzierep/MicrobiomeProfiler" \
       org.opencontainers.image.licenses="GPL-2.0-or-later"
 
 # Build tooling for the clusterProfiler/golem/ggtree dependency chain.
@@ -34,13 +34,19 @@ RUN apt-get update \
         ca-certificates \
         curl \
         git \
+        net-tools \
+        python3-venv \
     && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m venv /opt/galaxy_ie_helpers \
+    && /opt/galaxy_ie_helpers/bin/pip install --no-cache-dir galaxy-ie-helpers
+ENV PATH="/opt/galaxy_ie_helpers/bin:$PATH"
 
 # Fetch the application while building rather than vendoring it in this
 # packaging repository. ARGs keep the source overridable for development builds.
 ARG APP_SOURCE=/opt/src/MicrobiomeProfiler
-ARG APP_REPOSITORY=https://github.com/yulab-smu/microbiomeprofiler.git
-ARG APP_REF=devel
+ARG APP_REPOSITORY=https://github.com/paulzierep/MicrobiomeProfiler.git
+ARG APP_REF=galaxy-output
 RUN git clone --depth 1 --branch "$APP_REF" "$APP_REPOSITORY" "$APP_SOURCE" \
     && rm -rf "$APP_SOURCE/.git"
 

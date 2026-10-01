@@ -1,9 +1,9 @@
 # MicrobiomeProfiler is not vendored: the upstream repository is cloned into the
 # build tree on demand (see the `deps` target) and never committed.
-UPSTREAM_URL=https://github.com/yulab-smu/microbiomeprofiler
+UPSTREAM_URL=https://github.com/paulzierep/MicrobiomeProfiler
 # `main` is an almost empty stub (LICENSE only); the package lives on `devel`, which
 # is also the repository default branch.
-UPSTREAM_REF=devel
+UPSTREAM_REF=galaxy-output
 UPSTREAM_DIR=MicrobiomeProfiler
 UPSTREAM_SENTINEL=$(UPSTREAM_DIR)/DESCRIPTION
 

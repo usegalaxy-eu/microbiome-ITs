@@ -42,8 +42,8 @@ tables) work offline; only the enrichment lookups need the network.
     └── interactivetool_microbiomeprofiler.xml
 ```
 
-The upstream repository is **not vendored**. The Dockerfile shallow-clones its
-`devel` branch while building the image.
+The upstream repository is **not vendored**. The Dockerfile shallow-clones the
+`galaxy-output` branch from the application fork while building the image.
 
 ## Build
 

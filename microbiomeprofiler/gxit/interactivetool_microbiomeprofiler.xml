@@ -10,6 +10,12 @@
     </entry_points>
     <environment_variables>
         <environment_variable name="PORT">8080</environment_variable>
+        <environment_variable name="HISTORY_ID">$__history_id__</environment_variable>
+        <environment_variable name="REMOTE_HOST">$__galaxy_url__</environment_variable>
+        <environment_variable name="GALAXY_WEB_PORT">8080</environment_variable>
+        <environment_variable name="GALAXY_URL">$__galaxy_url__</environment_variable>
+        <environment_variable name="DEBUG">TRUE</environment_variable>
+        <environment_variable name="API_KEY" inject="api_key"/>
     </environment_variables>
     <!-- MicrobiomeProfiler is an R package that builds its own Shiny app, so the
          command mirrors the image entrypoint: build the golem app object, then
@@ -17,6 +23,12 @@
          127.0.0.1 by default, which Galaxy cannot reach. The port below has to
          match <port> and ARG PORT in the Dockerfile. -->
     <command detect_errors="exit_code"><![CDATA[
+        mkdir -p microbiomeprofiler_inputs microbiomeprofiler_outputs ;
+        export MICROBIOMEPROFILER_OUTPUT_DIR=\$PWD/microbiomeprofiler_outputs ;
+#if $input_table
+        cp -f '$input_table' microbiomeprofiler_inputs/annotation_table.tsv ;
+        export MICROBIOMEPROFILER_INPUT=\$PWD/microbiomeprofiler_inputs/annotation_table.tsv ;
+#end if
         exec R --vanilla -q -e "suppressMessages(library(MicrobiomeProfiler)) ; app <- MicrobiomeProfiler::run_MicrobiomeProfiler() ; shiny::runApp(app, host = '0.0.0.0', port = 8080, launch.browser = FALSE)"
     ]]></command>
     <inputs>
@@ -24,8 +36,12 @@
             help="Tab separated table of microbial gene annotations with a gene identifier column (KEGG KO, or a column you map to one in the app). Pre-uploading it is convenient but not required - the app can also fetch and cache datasets itself."/>
     </inputs>
     <outputs>
+        <collection name="output_collection" type="list" label="MicrobiomeProfiler results">
+            <discover_datasets pattern="__designation_and_ext__" directory="microbiomeprofiler_outputs" visible="false"/>
+        </collection>
     </outputs>
     <tests>
+        <test expect_num_outputs="1"/>
     </tests>
     <help><![CDATA[
 `MicrobiomeProfiler <https://github.com/yulab-smu/microbiomeprofiler>`_ is an R
@@ -51,8 +67,10 @@ Supported workflows:
 
 .. class:: infomark
 
-**Results are downloaded from the browser.** Every module has its own download
-buttons; nothing is written into the Galaxy history.
+**Results are sent to your Galaxy history.** Every module download is also saved
+to the *MicrobiomeProfiler results* collection and uploaded directly in the
+background. The collection becomes available when the interactive job ends,
+even if direct upload is unavailable.
 
 .. class:: infomark
 
