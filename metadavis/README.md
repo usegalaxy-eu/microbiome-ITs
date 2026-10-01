@@ -1,0 +1,218 @@
+# MetaDAVis as a Galaxy Interactive Tool
+
+Docker packaging of [MetaDAVis](https://github.com/GudaLab/MetaDAVis) (Jagadesan
+& Guda, PLOS ONE 2025), an R Shiny application for 16S and whole-metagenome data
+analysis, built so it can be used from Galaxy through the
+[Interactive Tools](https://training.galaxyproject.org/training-material/topics/dev/tutorials/interactive-tools/tutorial.html)
+framework.
+
+```
+.
+├── Dockerfile                        # image definition
+├── Makefile                          # upstream clone + build / run helpers
+├── docker/
+│   ├── install.R                     # R package installation + verification
+│   └── entrypoint.sh                 # container entrypoint
+├── gxit/
+│   └── interactivetool_metadavis.xml # Galaxy interactive tool
+└── tests/
+    ├── smoke_test.R                  # headless check of the built image
+    ├── phyloseq_test.R               # parser test for the Galaxy input format
+    └── data/                         # fixtures for the parser test
+```
+
+MetaDAVis itself is **not vendored**. `make deps` shallow-clones the upstream
+repository into `MetaDAVis/` right before the build, `make refresh_deps` starts
+from a fresh checkout (use it to pick up an upstream update), and `make
+clean_deps` removes it again. The directory is in `.gitignore`, so nothing of
+the upstream repository ends up in this repository.
+
+```bash
+make deps                 # clone only
+make docker               # clone if needed, then build
+make refresh_deps docker  # fresh checkout, then build
+make re                   # clean_deps + docker from scratch
+```
+
+Pin a different upstream state by overriding the make variables:
+
+```bash
+make docker UPSTREAM_REF=v1.2.0     # a tag
+make docker UPSTREAM_REF=<sha>      # a specific commit
+```
+
+## Build
+
+```bash
+make docker
+```
+
+The image is built on `rocker/shiny-verse:4.4.3`, which is R 4.4.3 /
+Bioconductor 3.20 / shiny 1.10.0 / ggplot2 3.5.2 - the versions the upstream
+README recommends and the app was written against. The Bioconductor stack
+(phyloseq, microbiome, ComplexHeatmap, scater, DESeq2, mia, ...) plus the two
+GitHub packages (microbiomeutilities, maaslin3) are compiled from source, so
+expect roughly **30-60 minutes** on a first build; afterwards Docker caches the
+layer and only the app copy is rebuilt.
+
+`docker/install.R` verifies at the end of the build that every package can be
+*loaded*, not just installed, and fails the build if one is broken.
+
+Override the base image or the port if needed:
+
+```bash
+docker build --build-arg BASE_IMAGE=rocker/shiny-verse:4.5.3 --build-arg PORT=9000 -t metadavis-gxit:latest .
+```
+
+## Run it standalone
+
+```bash
+make d        # detached, http://127.0.0.1:8080
+make log      # follow the Shiny startup log
+make stop
+```
+
+`METADAVIS_JOB_DIR` (set by the Makefile to `/tmp/metadavis`) is where the app
+copy and any results are written; it defaults to the current directory.
+
+## Check the image
+
+```bash
+make smoke    # packages load, example data parses, DESeq2 runs, staging shim works
+make check    # start a container and GET / on the published port
+```
+
+`make smoke` is the one to run after an upstream update: it exercises the
+compiled R stack and the Galaxy input staging on the example data shipped with
+MetaDAVis, without needing a browser.
+
+## Publish to Docker Hub
+
+```bash
+DOCKERHUB_PASSWORD=<token> USERNAME=<hub-user> make push_hub
+```
+
+This tags the image as `paulzierep/metadavis-gxit:1.0.0` and `:latest` (see the
+variables at the top of the Makefile), logs in with `docker login
+--password-stdin`, pushes both tags and logs out again. The token is only read
+from the environment - do not put it into the repository.
+
+## Register it in Galaxy
+
+1. Build the image locally, then tag it with the name the tool XML asks for
+   (`paulzierep/metadavis-gxit:latest`). `make docker` does both.
+2. Copy `gxit/interactivetool_metadavis.xml` into Galaxy's `tools/interactive/`
+   directory.
+3. Make sure interactive tools are enabled, e.g. in `config/galaxy.yml`:
+
+   ```yaml
+   interactivetools_enable: true
+   ```
+
+4. The Docker runner has to publish container ports, which is the default:
+
+   ```yaml
+   docker:
+     runner: docker
+     local_container_config:
+       volatile: {image: null}
+   ```
+
+   and interactive tools additionally need a reachable proxy
+   (`galaxy.yml`: `interactivetools_prefix`, `gxit_proxy_port`) when you serve
+   Galaxy on a public host.
+
+The port in `<entry_point>` (8080) has to match `ARG PORT` in the Dockerfile -
+Galaxy publishes exactly that container port. `Makefile` keeps the three in
+sync.
+
+## Test it locally with planemo
+
+```bash
+planemo serve --host 0.0.0.0 --port 8080 gxit/
+```
+
+and add to your `config/galaxy.yml` (`$__galaxy_url__` is only used by Galaxy
+internals, the container itself does not call back into Galaxy):
+
+```yaml
+docker:
+  runner: docker
+  local_container_config:
+    docker_run_extra_arguments: "--add-host localhost:host-gateway"
+```
+
+## How the inputs are wired up
+
+The tool takes three tables and offers them to the application as the **Galaxy
+input** format, which sits in the *Upload files* tab next to the browser upload
+and the built-in example data:
+
+| Tool input  | Select Input format | Staged file                     | Environment variable        |
+| ----------- | ------------------- | ------------------------------- | --------------------------- |
+| OTU table   | `Galaxy input`      | `metadavis_inputs/otu`          | `METADAVIS_OTU_TABLE`       |
+| taxonomy    | `Galaxy input`      | `metadavis_inputs/taxonomy`     | `METADAVIS_TAXONOMY_TABLE`  |
+| metadata    | `Galaxy input`      | `metadavis_inputs/metadata`     | `METADAVIS_METADATA_FILE`   |
+
+The three tables use the phyloseq layout, which MetaDAVis upstream does not
+support: an **OTU/feature table** with features in the rows and samples in the
+columns, a **taxonomy table** with the same feature ids in the rows and one
+column per rank, and a **sample metadata** table with the sample ids in the first
+column and the condition/group in the second. Select *Galaxy input* and press
+*Submit* to load them.
+
+This is implemented in the app itself (`scripts/data_input.R`, `server.R`,
+`ui.R`) rather than by patching the image build, so the format is part of the
+fork and nothing has to be spliced into `server.R` at image build time.
+
+Two details worth knowing:
+
+- **No separator parameters.** Galaxy datasets have no meaningful extension, so
+  the field separator is detected from each file header (`detect_sep()`), which
+  makes the extra form fields and the `METADAVIS_*_SEPARATOR` variables
+  unnecessary. Tab and comma both work.
+- **No taxonomy level parameter.** The application already has its own
+  *Choose the level to display* control, so the tool does not force one.
+
+Features present in the OTU table but absent from the taxonomy table are
+reported as `Unclassified` rather than as an empty name, because an empty taxon
+label is invisible in the taxonomy table and in plot labels.
+
+## Results
+
+The application is result-export oriented: every table and plot has a download
+button, and the *Run* tab bundles all completed analyses into one ZIP. Those
+downloads go through the browser, not through Galaxy.
+
+The one result that lands on disk is the MaAsLin3 output directory
+(`app/www/hmp2_output` plus `app/www/hmp2_output.zip`), because the app writes it
+relative to its own directory - which is why the entrypoint copies the app into
+the job directory instead of serving `/opt/MetaDAVis` directly. Declare it in
+`<outputs>` if you want it in the history, for example:
+
+```xml
+<collection name="maaslin3_output" label="MaAsLin3 output files">
+    <discover_datasets pattern="*" directory="app/www/hmp2_output" format="txt"/>
+</collection>
+```
+
+The only output declared out of the box is `metadavis_startup.txt`, which the
+entrypoint always writes (resolved format, staged files, R session info), so
+the job ends cleanly whether or not the user ran an analysis.
+
+## Upgrading MetaDAVis
+
+```bash
+make refresh_deps docker
+```
+
+or, to build a different upstream state:
+
+```bash
+make docker UPSTREAM_REF=<tag-or-sha>
+```
+
+The Galaxy input format is part of the cloned app, so the fork has to be
+cloned rather than plain upstream. `UPSTREAM_URL` / `UPSTREAM_REF` point at the
+fork and its `galaxy-input` branch by default; switch them back to upstream to
+build a version without the Galaxy input format.

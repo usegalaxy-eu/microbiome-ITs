@@ -1,0 +1,87 @@
+# MetaDAVis (https://github.com/GudaLab/MetaDAVis) packaged as a Galaxy
+# Interactive Tool image.
+#
+# The upstream README recommends R >= 4.4.2 with Bioconductor >= 3.20; the
+# 4.4.3 tag of rocker/shiny-verse is exactly that pairing (R 4.4.3, Bioconductor
+# 3.20, shiny 1.10.0, ggplot2 3.5.2), which keeps us on the ggplot2 3.x/4.x
+# boundary the app was written against. Bump the tag to 4.5.x/4.6.x only together
+# with a check of the plot code.
+
+ARG BASE_IMAGE=rocker/shiny-verse:4.4.3
+FROM ${BASE_IMAGE}
+
+LABEL org.opencontainers.image.title="MetaDAVis" \
+      org.opencontainers.image.description="MetaDAVis R Shiny app, packaged for the Galaxy Interactive Tools framework" \
+      org.opencontainers.image.source="https://github.com/GudaLab/MetaDAVis" \
+      org.opencontainers.image.licenses="GPL-3.0-or-later"
+
+# System libraries listed in the upstream README, minus the ones rocker/shiny
+# already provides. libtiff-dev is the Ubuntu 24.04 name for libtiff5-dev, and
+# libgsl-dev is needed by DirichletMultinomial (a dependency of decontam, and
+# through it of microbiome), which BiocManager installs without failing the
+# build if it cannot compile.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        gfortran \
+        libcurl4-openssl-dev \
+        libssl-dev \
+        libxml2-dev \
+        libfontconfig1-dev \
+        libfreetype6-dev \
+        libpng-dev \
+        libjpeg-dev \
+        libtiff-dev \
+        libharfbuzz-dev \
+        libfribidi-dev \
+        libicu-dev \
+        libgsl-dev \
+        libglpk-dev \
+        cmake \
+        pkg-config \
+        fonts-dejavu-core \
+        fonts-texgyre \
+        ca-certificates \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install the R dependencies before copying the app so that editing the app does
+# not invalidate the (long) package build layer.
+COPY docker/install.R /tmp/install.R
+RUN Rscript --vanilla /tmp/install.R && rm -f /tmp/install.R
+
+# Headless Chrome for plotly::save_image(), which the bulk export uses for the
+# 3D plots. Best effort: without it everything else still works, only the static
+# export of plotly figures fails.
+RUN set -eux; \
+    if curl -fsSL -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends /tmp/chrome.deb \
+        && rm -f /tmp/chrome.deb \
+        && rm -rf /var/lib/apt/lists/*; \
+    else \
+        echo "Chrome could not be downloaded, plotly::save_image() will not work"; \
+        rm -f /tmp/chrome.deb; \
+    fi
+ENV CHROMOTE_CHROME=/usr/bin/google-chrome
+
+# The application. The Galaxy input format ("galaxy" in the UI, parsed as the
+# phyloseq three-file layout) lives in the app itself, so nothing has to be
+# spliced into server.R at build time.
+COPY MetaDAVis/ /opt/MetaDAVis/
+RUN rm -rf /opt/MetaDAVis/.git
+
+# The port the app listens on. It has to match <port> in the tool XML, because
+# Galaxy publishes exactly that container port for the interactive tool entry
+# point. PORT is an env var so the same image can be run standalone on another
+# port.
+ARG PORT=8080
+ENV PORT=$PORT
+EXPOSE $PORT
+
+COPY docker/entrypoint.sh /usr/local/bin/metadavis-entrypoint
+RUN chmod 0755 /usr/local/bin/metadavis-entrypoint
+
+# CMD, not ENTRYPOINT: Galaxy overrides the command of an interactive tool job
+# with the tool's own <command>, which has to reach the shell untouched.
+CMD ["/usr/local/bin/metadavis-entrypoint"]

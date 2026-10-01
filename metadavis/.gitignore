@@ -1,0 +1,4 @@
+# Upstream MetaDAVis checkout, created by `make deps` at build time
+MetaDAVis/
+
+.password

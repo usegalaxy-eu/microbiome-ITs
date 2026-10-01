@@ -1,0 +1,4 @@
+# Upstream checkouts, created by `make deps` at build time
+MetaDAVis/
+microbiomeprofiler/MicrobiomeProfiler/
+.password

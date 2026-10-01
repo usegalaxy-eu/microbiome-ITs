@@ -1,0 +1,74 @@
+<tool id="interactive_tool_microbiomeprofiler" tool_type="interactive" name="MicrobiomeProfiler" version="1.0.0">
+    <description>Interactive functional enrichment analysis of microbiome data</description>
+    <requirements>
+        <container type="docker">paulzierep/microbiomeprofiler-gxit:latest</container>
+    </requirements>
+    <entry_points>
+        <entry_point name="MicrobiomeProfiler" requires_domain="True">
+            <port>8080</port>
+        </entry_point>
+    </entry_points>
+    <environment_variables>
+        <environment_variable name="PORT">8080</environment_variable>
+    </environment_variables>
+    <!-- MicrobiomeProfiler is an R package that builds its own Shiny app, so the
+         command mirrors the image entrypoint: build the golem app object, then
+         hand it to shiny::runApp() with an explicit host. runApp() binds to
+         127.0.0.1 by default, which Galaxy cannot reach. The port below has to
+         match <port> and ARG PORT in the Dockerfile. -->
+    <command detect_errors="exit_code"><![CDATA[
+        exec R --vanilla -q -e "suppressMessages(library(MicrobiomeProfiler)) ; app <- MicrobiomeProfiler::run_MicrobiomeProfiler() ; shiny::runApp(app, host = '0.0.0.0', port = 8080, launch.browser = FALSE)"
+    ]]></command>
+    <inputs>
+        <param name="input_table" type="data" optional="true" format="tabular" label="Annotation table"
+            help="Tab separated table of microbial gene annotations with a gene identifier column (KEGG KO, or a column you map to one in the app). Pre-uploading it is convenient but not required - the app can also fetch and cache datasets itself."/>
+    </inputs>
+    <outputs>
+    </outputs>
+    <tests>
+    </tests>
+    <help><![CDATA[
+`MicrobiomeProfiler <https://github.com/yulab-smu/microbiomeprofiler>`_ is an R
+package and Shiny application for functional enrichment analysis in microbiome
+studies, built on the `clusterProfiler` ecosystem.
+
+.. class:: infomark
+
+**This tool needs internet access while it is running.** Enrichment is performed
+against live services - KEGG REST (`rest.kegg.jp`), eggNOG, SMPDB, Disbiome and
+HMDB - so the container has to be able to reach them. Annotation resources that
+ship with the package are available offline.
+
+Supported workflows:
+
+#. KEGG enrichment and GSEA for microbiome gene profiles
+#. COG enrichment and GSEA
+#. eggNOG-based KEGG pathway enrichment and GSEA
+#. Microbe-disease enrichment with Disbiome
+#. Microbial signature enrichment with BugSigDB
+#. Metabolite pathway enrichment with HMDB and SMPDB
+#. Interactive exploration with tables, dotplots and barplots
+
+.. class:: infomark
+
+**Results are downloaded from the browser.** Every module has its own download
+buttons; nothing is written into the Galaxy history.
+
+.. class:: infomark
+
+**Citation**
+
+Yu G (2024). MicrobiomeProfiler: An R package for microbiome functional
+enrichment analysis. Journal of Open Source Software.
+]]></help>
+    <citations>
+        <citation type="bibtex">@misc{yu2024microbiomeprofiler,
+            author       = {Yu, Guangchuang},
+            title        = {MicrobiomeProfiler: An R package for microbiome functional enrichment analysis},
+            year         = {2024},
+            journal      = {Journal of Open Source Software},
+            publisher    = {The Open Journal},
+            doi          = {10.21105/joss.06522}
+        }</citation>
+    </citations>
+</tool>

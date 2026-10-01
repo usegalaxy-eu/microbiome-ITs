@@ -1,0 +1,9 @@
+# MicrobiomeProfiler itself IS part of the build context: the Dockerfile copies
+# it to /opt/src/MicrobiomeProfiler so that install.R can install it with
+# remotes::install_local(). Only its git metadata and editor droppings are
+# excluded - the upstream .git directory would otherwise add to the context and
+# invalidate the COPY layer on every fresh clone.
+MicrobiomeProfiler/.git
+.git
+**/.Rhistory
+**/.RData
