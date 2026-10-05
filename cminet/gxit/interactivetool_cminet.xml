@@ -36,9 +36,9 @@
     ]]></command>
     <inputs>
         <param name="abundance_table" type="data" format="tabular,csv" optional="true" label="Abundance table (optional)"
-            help="Microbiome abundance matrix in CMiNet layout: samples in the rows, the first column holding the sample ids, and one column per taxon. Comma or tab separated, the separator is detected from the header. Tick 'Is the data count-based?' inside the application unless the values are relative abundances, in which case they are shifted by a small constant to keep them strictly positive. Leave this empty to upload from the browser, import from the history, or start from the example data that ships with the application."/>
+            help="Microbiome abundance matrix in CMiNet layout: samples in the rows, the first column holding the sample ids, and one column per taxon. Comma or tab separated, and the separator is taken from the header, so a semicolon separated file works as well. Tick 'Is the data count-based?' inside the application unless the values are relative abundances, in which case they are shifted by a small constant to keep them strictly positive. Leave this empty to upload from the browser, import from the history, or start from the example data that ships with the application."/>
         <param name="weighted_network" type="data" format="tabular,csv" optional="true" label="Weighted network (optional)"
-            help="A previously computed weighted network, used by the 'Network Visualization' and 'Final Weighted Network' tabs so that they can be opened without running the full analysis again. Comma or tab separated, taxa in the rows and taxa in the columns. Leave this empty to use the network the analysis itself produces."/>
+            help="A previously computed weighted network, used by the 'Network Visualization' and 'Final Weighted Network' tabs so that they can be opened without running the full analysis again. Comma or tab separated, the separator is taken from the header, taxa in the rows and taxa in the columns. Leave this empty to use the network the analysis itself produces."/>
     </inputs>
     <outputs>
         <data name="startup_log" format="txt" from_work_dir="cminet_startup.txt"

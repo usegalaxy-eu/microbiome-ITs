@@ -49,7 +49,7 @@ Build and test:
 ```bash
 make deps          # clone the app fork (build input only)
 make docker        # build the image locally
-make test-fast     # smoke test + Galaxy integration test, no Galaxy needed
+make test-fast     # smoke test + Galaxy integration test + input handling, no Galaxy needed
 make check         # start the app and poll the port it answers on
 ```
 

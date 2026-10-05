@@ -110,8 +110,39 @@ test-galaxy-ie: deps
 	docker run --rm -v "$(UPSTREAM_DIR):/app:ro" -v "$(CURDIR)/tests:/tests:ro" \
 	    --entrypoint Rscript $(docker_name):latest --vanilla /tests/galaxy_ie_test.R /app
 
+# input handling of the entry point: the tool accepts tabular as well as csv, so
+# anything that is not comma separated has to be re-separated before the app sees
+# it. Runs the real entry point with CMINET_NORMALIZE_ONLY, no Shiny session.
+normalize-test:
+	docker run --rm -v "$(CURDIR)/tests:/tests:ro" \
+	    --entrypoint Rscript $(docker_name):latest --vanilla \
+	    /tests/normalize_test.R /usr/local/bin/cminet-entrypoint
+
+# the same, with the input directory mounted read-only, which a Galaxy job or a
+# hand-run container can produce. The conversion has nowhere to write in that
+# case: it has to say so and carry on with the dataset as staged. Driven from
+# here rather than from the R test because a real read-only bind mount cannot be
+# made from inside the container.
+normalize-readonly:
+	@rm -rf "$(CURDIR)/.readonly-job" && mkdir -p "$(CURDIR)/.readonly-job/cminet_inputs"
+	@printf 'Sample\tA\tB\ns1\t5\t3\n' > "$(CURDIR)/.readonly-job/cminet_inputs/abundance"
+	@log=$$(docker run --rm -v "$(CURDIR)/.readonly-job/cminet_inputs:/tmp/cminet/cminet_inputs:ro" \
+	    -v "$(CURDIR)/.readonly-job/out:/tmp/cminet/cminet_outputs" \
+	    -e CMINET_JOB_DIR=/tmp/cminet -e CMINET_NORMALIZE_ONLY=1 \
+	    $(docker_name):latest /usr/local/bin/cminet-entrypoint 2>&1); \
+	echo "$$log" | grep -q "could not be converted" \
+	    && echo "PASS - a read-only input directory is reported" \
+	    || { echo "FAIL - a read-only input directory was not reported"; exit 1; }; \
+	echo "$$log" | grep -q "^abundance matrix:  .*abundance (" \
+	    && echo "PASS - the entry point carries on with the unconverted dataset" \
+	    || { echo "FAIL - the unconverted dataset was not handed over"; exit 1; }; \
+	echo "$$log" | grep -q "^abundance: " \
+	    && { echo "FAIL - a converted copy was reported despite the read-only mount"; exit 1; } \
+	    || echo "PASS - no converted copy is claimed when none was written"; \
+	rm -rf "$(CURDIR)/.readonly-job"
+
 # everything that can be checked without starting the app
-test-fast: smoke test-galaxy-ie
+test-fast: smoke test-galaxy-ie normalize-test normalize-readonly
 
 # is the app actually answering on the published port?
 # Polled rather than slept on: loading SpiecEasi/SPRING/CMiNet plus the app's
@@ -148,4 +179,4 @@ clean:
 	docker container prune
 	docker rmi $(docker_name):latest || true
 
-.PHONY: deps refresh_deps clean_deps docker it d smoke test-galaxy-ie test-fast check sh log stop clean push_hub do_push hub_login remove_hub_credentials hub_logout docker_logout
+.PHONY: deps refresh_deps clean_deps docker it d smoke test-galaxy-ie normalize-test normalize-readonly test-fast check sh log stop clean push_hub do_push hub_login remove_hub_credentials hub_logout docker_logout
