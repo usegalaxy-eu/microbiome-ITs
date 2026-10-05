@@ -9,7 +9,7 @@ on:
       - 'cminet/**'
   push:
     branches:
-      - master
+      - main
     paths:
       - '.github/workflows/ci.yml'
       - 'metadavis/**'

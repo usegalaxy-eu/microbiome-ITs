@@ -132,7 +132,7 @@ The same happens automatically when a GitHub **release** is published.
 
 ### Automatic builds
 
-Pull requests and pushes to `master` build the images of the tool directories
+Pull requests and pushes to `main` build the images of the tool directories
 that changed, but **do not push** - those jobs only prove the Dockerfile still
 builds.
 
