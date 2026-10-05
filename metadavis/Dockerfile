@@ -12,8 +12,11 @@ FROM ${BASE_IMAGE}
 
 LABEL org.opencontainers.image.title="MetaDAVis" \
       org.opencontainers.image.description="MetaDAVis R Shiny app, packaged for the Galaxy Interactive Tools framework" \
-      org.opencontainers.image.source="https://github.com/GudaLab/MetaDAVis" \
-      org.opencontainers.image.licenses="GPL-3.0-or-later"
+      org.opencontainers.image.source="https://github.com/GudaLab/MetaDAVis"
+
+# No org.opencontainers.image.licenses label on purpose: the upstream repository
+# carries no LICENSE file and no license metadata, so any license claim here
+# would be unsourced. Add the label once the upstream license is confirmed.
 
 # System libraries listed in the upstream README, minus the ones rocker/shiny
 # already provides. libtiff-dev is the Ubuntu 24.04 name for libtiff5-dev, and
