@@ -1,0 +1,15 @@
+# Ignore the app checkout the `deps` target clones into the build tree; it is a
+# build input only and must never be committed.
+/CMiNetShinyAPP/
+
+# Galaxy job working directories, when the image is run standalone with
+# CMINET_JOB_DIR pointing inside the build tree.
+/cminet_inputs/
+/cminet_outputs/
+/app/
+/cminet_startup.txt
+
+# Image build artefacts
+*.tar
+*.tar.gz
+.password

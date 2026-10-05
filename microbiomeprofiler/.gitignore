@@ -1,4 +1,7 @@
-# Upstream checkouts, created by `make deps` at build time
-MetaDAVis/
-microbiomeprofiler/MicrobiomeProfiler/
+# Upstream app checkout, created by `make deps` at build time and never
+# committed. The path is relative to this directory, so it is just the app
+# directory - not "microbiomeprofiler/MicrobiomeProfiler/".
+MicrobiomeProfiler/
+
+# Credentials for `make push_hub`
 .password

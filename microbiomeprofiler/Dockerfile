@@ -42,21 +42,51 @@ RUN python3 -m venv /opt/galaxy_ie_helpers \
     && /opt/galaxy_ie_helpers/bin/pip install --no-cache-dir galaxy-ie-helpers
 ENV PATH="/opt/galaxy_ie_helpers/bin:$PATH"
 
+# Dependencies first, on their own layer. This is the tens-of-minutes part and
+# it only changes when install.R changes, so keeping it ahead of the clone is
+# what makes an app-only rebuild take a minute instead of half an hour.
+#
+# install.R is copied to /tmp rather than run as docker/install.R because the
+# image's working directory is /, not the build context.
+COPY docker/install.R /tmp/install.R
+RUN MICROBIOMEPROFILER_DEPS_ONLY=1 Rscript --vanilla /tmp/install.R
+COPY local_mpp /tmp/local_mpp
+
+
 # Fetch the application while building rather than vendoring it in this
 # packaging repository. ARGs keep the source overridable for development builds.
+#
+# APP_REVISION is not decoration: a RUN layer is cached on its command string and
+# build args, and BuildKit cannot see that the remote branch moved. Cloning a
+# branch under a constant APP_REF therefore reused the previously cached clone,
+# so a rebuild silently produced an image containing the *old* app. Pinning the
+# commit makes the layer key change whenever the app changes.
 ARG APP_SOURCE=/opt/src/MicrobiomeProfiler
 ARG APP_REPOSITORY=https://github.com/paulzierep/MicrobiomeProfiler.git
 ARG APP_REF=galaxy-output
-RUN git clone --depth 1 --branch "$APP_REF" "$APP_REPOSITORY" "$APP_SOURCE" \
-    && rm -rf "$APP_SOURCE/.git"
+ARG CACHE_BUSTER
+ARG APP_REVISION=branch
+RUN set -eux; \
+    echo "CB=$CACHE_BUSTER"; \
+    if [ -d /tmp/local_mpp ]; then \
+        cp -r /tmp/local_mpp "$APP_SOURCE"; \
+    elif [ "$APP_REVISION" = "branch" ]; then \
+        git clone --depth 1 --branch "$APP_REF" "$APP_REPOSITORY" "$APP_SOURCE"; \
+    else \
+        git init -q "$APP_SOURCE"; \
+        git -C "$APP_SOURCE" remote add origin "$APP_REPOSITORY"; \
+        git -C "$APP_SOURCE" fetch -q --depth 1 origin "$APP_REVISION"; \
+        git -C "$APP_SOURCE" checkout -q FETCH_HEAD; \
+    fi; \
+    rm -rf "$APP_SOURCE/.git"
 
-# Dependencies and the package itself are installed together. The source tree
-# is dropped afterwards because the app runs from the installed library.
-# (install.R is copied to /tmp rather than run as docker/install.R because the
-# image's working directory is /, not the build context.)
+# The app package itself, plus the verification that it loads and builds. Runs
+# after the clone, so a new app commit costs a minute rather than a full rebuild.
+# The source tree is dropped afterwards because the app runs from the installed
+# library.
 ENV MICROBIOMEPROFILER_SOURCE=$APP_SOURCE
-COPY docker/install.R /tmp/install.R
-RUN Rscript --vanilla /tmp/install.R && rm -f /tmp/install.R && rm -rf $APP_SOURCE
+RUN MICROBIOMEPROFILER_APP_ONLY=1 Rscript --vanilla /tmp/install.R \
+    && rm -f /tmp/install.R
 
 # The port the app listens on. It has to match <port> in the tool XML, because
 # Galaxy publishes exactly that container port for the interactive tool entry

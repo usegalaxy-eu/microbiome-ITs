@@ -13,6 +13,25 @@
 # Where the package comes from is a build argument so that the image can be
 # rebuilt from a different checkout without editing this script:
 #   --build-arg APP_SOURCE=/opt/src/MicrobiomeProfiler
+#
+# This script runs in two passes, because the two halves have very different
+# costs and very different reasons to change. Building the dependency chain
+# (yulab + Bioconductor + clusterProfiler) takes tens of minutes and only changes
+# when install.R itself changes. Installing the app package takes under a minute
+# and changes with every app commit. Doing both in one pass meant every app edit
+# invalidated the dependency layer, so the image could not be rebuilt in a usable
+# time:
+#
+#   MICROBIOMEPROFILER_DEPS_ONLY=1   dependencies only, then exit
+#   MICROBIOMEPROFILER_APP_ONLY=1    skip the dependencies, install + verify the app
+#
+# The Dockerfile runs the dependency pass before it clones the app, so a new app
+# commit only re-runs the cheap second pass.
+install_deps_only <- nzchar(Sys.getenv("MICROBIOMEPROFILER_DEPS_ONLY"))
+install_app_only <- nzchar(Sys.getenv("MICROBIOMEPROFILER_APP_ONLY"))
+if (install_deps_only && install_app_only) {
+    stop("set at most one of MICROBIOMEPROFILER_DEPS_ONLY / MICROBIOMEPROFILER_APP_ONLY")
+}
 
 options(
     repos = c(
@@ -116,6 +135,10 @@ cat(sprintf("== R %s / Bioconductor %s\n",
             paste(R.version$major, R.version$minor, sep = "."),
             as.character(BiocManager::version())))
 
+# Everything from here to the app install is third-party dependency work, which
+# the cached pass owns. In the app pass it is already on disk.
+if (!install_app_only) {
+
 # --------------------------------------------------------------------------
 # rlang has to be upgraded FIRST, before anything in this session can load the
 # old one.
@@ -197,6 +220,13 @@ install_missing(cran_packages, "CRAN", function(pkgs) {
         pkgs <- unloadable_packages(pkgs)
     }
 })
+
+}
+
+if (install_deps_only) {
+    cat("\n== dependencies installed; the app is installed in the next build layer\n")
+    quit(save = "no", status = 0L)
+}
 
 cat(sprintf("\n== installing MicrobiomeProfiler from %s\n", app_source))
 if (!file.exists(file.path(app_source, "DESCRIPTION"))) {

@@ -70,10 +70,26 @@ hub_logout:
 docker_logout:
 	docker logout
 
+# The commit the branch currently points at. Passed as APP_REVISION so that a new
+# upstream commit invalidates the clone layer: Docker caches a RUN layer on its
+# command string and build args and cannot see that a git branch has moved, which
+# is what made earlier rebuilds silently reuse a stale checkout.
+app_revision ?= $(shell git ls-remote $(UPSTREAM_URL) $(UPSTREAM_REF) 2>/dev/null | cut -f1)
+
 docker:
-	@docker build --build-arg PORT=${internal_port} -t $(docker_name):latest .
+	@echo "== building $(docker_name):latest from $(UPSTREAM_REF) @ $(app_revision)"
+	@docker build --build-arg PORT=${internal_port} \
+	    --build-arg APP_REVISION=$(app_revision) \
+	    -t $(docker_name):latest .
 	@docker tag $(docker_name):latest ${WEB_TARGET}
 	@docker tag $(docker_name):latest ${WEB_LATEST}
+
+# Rebuild after new commits have been pushed to the app branch. Safe to run
+# repeatedly: the dependency layer is reused, so only the clone and the app
+# install are redone.
+.PHONY: rebuild_app
+rebuild_app:
+	@$(MAKE) --no-print-directory docker
 
 # standalone run, without Galaxy: the app is served on http://127.0.0.1:8080
 it:
@@ -116,4 +132,4 @@ clean:
 	docker container prune
 	docker rmi $(docker_name):latest || true
 
-.PHONY: deps refresh_deps clean_deps docker it d sh log stop check clean push_hub do_push hub_login remove_hub_credentials hub_logout docker_logout
+.PHONY: rebuild_app deps refresh_deps clean_deps docker it d sh log stop check clean push_hub do_push hub_login remove_hub_credentials hub_logout docker_logout

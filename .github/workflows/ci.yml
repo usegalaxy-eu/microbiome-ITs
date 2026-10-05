@@ -6,6 +6,7 @@ on:
       - '.github/workflows/ci.yml'
       - 'metadavis/**'
       - 'microbiomeprofiler/**'
+      - 'cminet/**'
   push:
     branches:
       - master
@@ -13,6 +14,7 @@ on:
       - '.github/workflows/ci.yml'
       - 'metadavis/**'
       - 'microbiomeprofiler/**'
+      - 'cminet/**'
   release:
     types:
       - published
@@ -28,6 +30,7 @@ on:
         options:
           - metadavis
           - microbiomeprofiler
+          - cminet
       tag:
         description: Quay tag
         required: true
@@ -44,6 +47,7 @@ jobs:
     outputs:
       metadavis: ${{ steps.filter.outputs.metadavis }}
       microbiomeprofiler: ${{ steps.filter.outputs.microbiomeprofiler }}
+      cminet: ${{ steps.filter.outputs.cminet }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -59,6 +63,9 @@ jobs:
             microbiomeprofiler:
               - '.github/workflows/ci.yml'
               - 'microbiomeprofiler/**'
+            cminet:
+              - '.github/workflows/ci.yml'
+              - 'cminet/**'
 
   build-metadavis:
     needs: changes
@@ -76,6 +83,15 @@ jobs:
     with:
       context: microbiomeprofiler
       image: microbiomeprofiler-gxit
+      push: false
+
+  build-cminet:
+    needs: changes
+    if: needs.changes.outputs.cminet == 'true'
+    uses: ./.github/workflows/image.yml
+    with:
+      context: cminet
+      image: cminet-gxit
       push: false
 
   release-metadavis:
@@ -100,6 +116,19 @@ jobs:
     with:
       context: microbiomeprofiler
       image: microbiomeprofiler-gxit
+      push: true
+      tag: ${{ github.event.client_payload.tag || inputs.tag || github.event.release.tag_name }}
+    secrets: inherit
+
+  release-cminet:
+    if: >-
+      github.event_name == 'release' ||
+      (github.event_name == 'repository_dispatch' && github.event.client_payload.image == 'cminet') ||
+      (github.event_name == 'workflow_dispatch' && inputs.image == 'cminet')
+    uses: ./.github/workflows/image.yml
+    with:
+      context: cminet
+      image: cminet-gxit
       push: true
       tag: ${{ github.event.client_payload.tag || inputs.tag || github.event.release.tag_name }}
     secrets: inherit

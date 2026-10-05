@@ -28,12 +28,40 @@
 #if $input_table
         cp -f '$input_table' microbiomeprofiler_inputs/annotation_table.tsv ;
         export MICROBIOMEPROFILER_INPUT=\$PWD/microbiomeprofiler_inputs/annotation_table.tsv ;
+        export MICROBIOMEPROFILER_INPUT_TYPE='$input_options.input_type' ;
+#if $input_options.input_type == 'gene'
+        export MICROBIOMEPROFILER_INPUT_SUBTYPE='$input_options.gene_type' ;
+#else if $input_options.input_type == 'metabolite'
+        export MICROBIOMEPROFILER_INPUT_SUBTYPE='$input_options.metabolite_type' ;
+#end if
 #end if
         exec R --vanilla -q -e "suppressMessages(library(MicrobiomeProfiler)) ; app <- MicrobiomeProfiler::run_MicrobiomeProfiler() ; shiny::runApp(app, host = '0.0.0.0', port = 8080, launch.browser = FALSE)"
     ]]></command>
     <inputs>
-        <param name="input_table" type="data" optional="true" format="tabular" label="Annotation table"
-            help="Tab separated table of microbial gene annotations with a gene identifier column (KEGG KO, or a column you map to one in the app). Pre-uploading it is convenient but not required - the app can also fetch and cache datasets itself."/>
+        <param name="input_table" type="data" optional="true" format="tabular,txt" label="Identifier list"
+            help="One identifier per line. Comma-, semicolon-, and tab-separated identifiers are also accepted. The selected input type determines which application tab is preloaded."/>
+        <conditional name="input_options">
+            <param name="input_type" type="select" label="Identifier type">
+                <option value="taxid" selected="true">NCBI TaxIDs</option>
+                <option value="gene">Gene identifiers</option>
+                <option value="metabolite">Metabolite identifiers</option>
+            </param>
+            <when value="taxid"/>
+            <when value="gene">
+                <param name="gene_type" type="select" label="Gene identifier system">
+                    <option value="KEGG" selected="true">KEGG KO</option>
+                    <option value="COG">COG</option>
+                    <option value="eggNOG">eggNOG</option>
+                </param>
+            </when>
+            <when value="metabolite">
+                <param name="metabolite_type" type="select" label="Metabolite identifier system">
+                    <option value="SMPDB.Metabolite.ID" selected="true">SMPDB metabolite ID</option>
+                    <option value="KEGG.ID">KEGG metabolite ID</option>
+                    <option value="HMDB.ID">HMDB ID</option>
+                </param>
+            </when>
+        </conditional>
     </inputs>
     <outputs>
         <collection name="output_collection" type="list" label="MicrobiomeProfiler results">
