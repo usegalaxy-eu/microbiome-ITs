@@ -96,9 +96,11 @@ d:
 	docker run -d $(port) -e CMINET_JOB_DIR=/tmp/cminet $(docker_name):latest
 
 # headless check of the R stack, the bundled example data and the Galaxy helper
-# wiring - run it after an app update before trusting the image
+# wiring - run it after an app update before trusting the image.
+# The app directory is the clone target inside the image, not /app: nothing mounts
+# the checkout here, so the path has to be where the Dockerfile put it.
 smoke:
-	docker run --rm -v "$(CURDIR)/tests:/tests:ro" --entrypoint Rscript $(docker_name):latest --vanilla /tests/smoke_test.R /app
+	docker run --rm -v "$(CURDIR)/tests:/tests:ro" --entrypoint Rscript $(docker_name):latest --vanilla /tests/smoke_test.R /opt/CMiNetShinyAPP
 
 # focused test of the Galaxy download registry and the history picker against the
 # real app checkout, with stubbed galaxy_ie_helpers commands. No Shiny session is

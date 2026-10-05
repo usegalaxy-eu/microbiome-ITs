@@ -98,6 +98,13 @@ EXPOSE $PORT
 COPY docker/entrypoint.sh /usr/local/bin/cminet-entrypoint
 RUN chmod 0755 /usr/local/bin/cminet-entrypoint
 
+# Put the galaxy_ie_helpers commands on PATH. The app also finds them by absolute
+# path, so this is belt and braces rather than a fix - but the helper commands
+# are part of the image's interface (the Send to Galaxy buttons and the history
+# picker), and microbiomeprofiler already exports this. Declared here instead of
+# next to the venv so the dependency layers above stay cached.
+ENV PATH="/opt/galaxy_ie_helpers/bin:$PATH"
+
 # CMD, not ENTRYPOINT: Galaxy overrides the command of an interactive tool job
 # with the tool's own <command>, which has to reach the shell untouched.
 CMD ["/usr/local/bin/cminet-entrypoint"]
