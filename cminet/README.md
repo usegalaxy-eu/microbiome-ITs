@@ -5,7 +5,7 @@ a Galaxy Interactive Tool (GxIT) image, in the same shape as the `metadavis` and
 `microbiomeprofiler` wrappers in this repository.
 
 The app itself is **not vendored**. It is cloned during the image build from the
-fork's `galaxy-integration` branch, which carries the Galaxy integration:
+fork's `galaxy-it-adaptations` branch, which carries the Galaxy integration:
 
 * a **Send to Galaxy** button next to every download, backed by a download
   registry rather than a silent background upload
@@ -79,7 +79,7 @@ API key, so offering them outside Galaxy would only produce errors.
 
 | | |
 |---|---|
-| Container | `quay.io/paulzierep/cminet-gxit:latest` |
+| Container | `quay.io/galaxy/cminet-gxit:latest` |
 | Port | 8080 |
 | Input | abundance matrix (required), weighted network (optional) |
 | Outputs | `cminet_startup.txt` plus a *CMiNet results* collection |

@@ -1,21 +1,28 @@
-# MetaDAVis is not vendored: the app is cloned into the build tree on demand
-# (see the `deps` target) and never committed.
+# MetaDAVis is not vendored. The image build clones the app itself inside the
+# Dockerfile, and `deps` clones a separate copy outside the repository for the
+# tests to read. Nothing app-related is ever written into this build tree.
 #
-# The default is the fork's `galaxy-input` branch, which adds the "Galaxy input"
-# format (OTU table + taxonomy + metadata) to the application. Override both
-# variables to build plain upstream, e.g.
+# The default is the fork's `galaxy-it-adaptations` branch, which adds the
+# "Galaxy input" format (OTU table + taxonomy + metadata) and the send-to-Galaxy
+# integration to the application. Override both variables to build plain upstream,
+# e.g.
 #   make refresh_deps docker UPSTREAM_URL=https://github.com/GudaLab/MetaDAVis UPSTREAM_REF=main
 UPSTREAM_URL=https://github.com/paulzierep/MetaDAVis
-UPSTREAM_REF=galaxy-input
-UPSTREAM_DIR=MetaDAVis
+UPSTREAM_REF=galaxy-it-adaptations
+
+# Where `deps` keeps the checkout. Kept outside the repository on purpose: a
+# checkout inside the build tree is a file the Dockerfile could pick up, and it is
+# one `rm -rf` away from being committed by accident.
+DEPS_ROOT?=/tmp/microbiome-ITs
+UPSTREAM_DIR=$(DEPS_ROOT)/metadavis/MetaDAVis
 UPSTREAM_SENTINEL=$(UPSTREAM_DIR)/scripts/MaAsLin3.R
 
 # These must produce the image the tool XML asks for
-# (<container type="docker">paulzierep/metadavis-gxit:latest</container>), otherwise
-# Galaxy pulls the old published image from the registry instead of using the
-# image you just built locally.
+# (<container type="docker">quay.io/galaxy/metadavis-gxit:latest</container>),
+# otherwise Galaxy pulls the old published image from the registry instead of
+# using the image you just built locally.
 docker_name=metadavis-gxit
-docker_repo=quay.io/paulzierep
+docker_repo=quay.io/galaxy
 # Must match <port> in gxit/interactivetool_metadavis.xml and ARG PORT in the
 # Dockerfile.
 internal_port=8080
@@ -29,22 +36,23 @@ WEB_LATEST=${docker_repo}/${docker_name}:latest
 
 re:clean docker
 
-# Shallow clone of the upstream app, checked in as a build input only. Written
-# as a .PHONY target rather than a file target so that a half-deleted or stale
-# checkout is repaired instead of being taken at face value.
+# Shallow clone of the app for the tests to read, outside the build tree. The
+# Dockerfile never sees this. Written as a .PHONY target rather than a file
+# target so that a half-deleted or stale checkout is repaired instead of being
+# taken at face value.
 .PHONY: deps
 deps:
 	@if [ -f "$(UPSTREAM_SENTINEL)" ]; then \
 	    echo "== $(UPSTREAM_DIR) is already there"; \
 	else \
-	    echo "== cloning $(UPSTREAM_URL) @ $(UPSTREAM_REF)"; \
-	    rm -rf "$(UPSTREAM_DIR)" && \
+	    echo "== cloning $(UPSTREAM_URL) @ $(UPSTREAM_REF) -> $(UPSTREAM_DIR)"; \
+	    mkdir -p "$(DEPS_ROOT)/metadavis" && \
 	    git clone --depth 1 --branch "$(UPSTREAM_REF)" "$(UPSTREAM_URL)" "$(UPSTREAM_DIR)" && \
 	    rm -rf "$(UPSTREAM_DIR)/.git"; \
 	fi
 
 # Same as deps, but always starts from a fresh checkout - use it to pick up an
-# upstream update (or a different UPSTREAM_REF).
+# app update (or a different UPSTREAM_REF).
 .PHONY: refresh_deps
 refresh_deps: clean_deps deps
 
@@ -100,9 +108,10 @@ test-trim:
 
 # focused test of the phyloseq (OTU + taxonomy + metadata) input path, without
 # booting the Shiny app. /docker carries the trimmer the tool runs, so the test
-# can check that what the tool hands over is what the parser accepts.
-test-phyloseq:
-	docker run --rm -v "$(CURDIR)/MetaDAVis:/app:ro" -v "$(CURDIR)/tests:/tests:ro" \
+# can check that what the tool hands over is what the parser accepts. Reads the
+# deps checkout the Dockerfile never sees.
+test-phyloseq: deps
+	docker run --rm -v "$(UPSTREAM_DIR):/app:ro" -v "$(CURDIR)/tests:/tests:ro" \
 	    -v "$(CURDIR)/docker:/docker:ro" \
 	    --entrypoint Rscript $(docker_name):latest --vanilla /tests/phyloseq_test.R /tests/data
 

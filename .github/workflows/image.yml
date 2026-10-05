@@ -21,7 +21,7 @@ on:
         required: false
 
 env:
-  IMAGE_REGISTRY: quay.io
+  IMAGE_REPOSITORY: quay.io/galaxy
 
 jobs:
   image:
@@ -38,7 +38,7 @@ jobs:
         if: inputs.push
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.IMAGE_REGISTRY }}
+          registry: quay.io
           username: $oauthtoken
           password: ${{ secrets.QUAY_OAUTH_TOKEN }}
 
@@ -48,7 +48,7 @@ jobs:
           context: ${{ inputs.context }}
           push: ${{ inputs.push }}
           tags: |
-            ${{ env.IMAGE_REGISTRY }}/paulzierep/${{ inputs.image }}:${{ inputs.tag }}
-            ${{ inputs.push && format('{0}/paulzierep/{1}:latest', env.IMAGE_REGISTRY, inputs.image) || '' }}
+            ${{ env.IMAGE_REPOSITORY }}/${{ inputs.image }}:${{ inputs.tag }}
+            ${{ inputs.push && format('{0}/{1}:latest', env.IMAGE_REPOSITORY, inputs.image) || '' }}
           cache-from: type=gha,scope=${{ inputs.image }}
           cache-to: type=gha,mode=max,scope=${{ inputs.image }}

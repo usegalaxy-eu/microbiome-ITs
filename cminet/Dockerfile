@@ -69,17 +69,15 @@ COPY docker/install.R /tmp/install.R
 RUN Rscript --vanilla /tmp/install.R && rm -f /tmp/install.R
 
 # The application is fetched while building rather than vendored in this
-# packaging repository. The fork's branch contains the Galaxy input, the
-# "Send to Galaxy" buttons and the history picker.
+# packaging repository. The fork's `galaxy-it-adaptations` branch carries the
+# Galaxy input format, the "Send to Galaxy" buttons and the history picker.
 ARG APP_REPOSITORY=https://github.com/paulzierep/CMiNetShinyAPP.git
-ARG APP_REF=galaxy-integration
+ARG APP_REF=galaxy-it-adaptations
 ARG APP_REVISION=branch
 ARG CACHE_BUSTER=
 RUN set -eux; \
     echo "CB=$CACHE_BUSTER"; \
-    if [ -d /tmp/local_cminet ]; then \
-        cp -r /tmp/local_cminet /opt/CMiNetShinyAPP; \
-    elif [ "$APP_REVISION" = "branch" ]; then \
+    if [ "$APP_REVISION" = "branch" ]; then \
         git clone --depth 1 --branch "$APP_REF" "$APP_REPOSITORY" /opt/CMiNetShinyAPP; \
     else \
         git init -q /opt/CMiNetShinyAPP; \

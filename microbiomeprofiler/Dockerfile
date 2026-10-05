@@ -50,11 +50,11 @@ ENV PATH="/opt/galaxy_ie_helpers/bin:$PATH"
 # image's working directory is /, not the build context.
 COPY docker/install.R /tmp/install.R
 RUN MICROBIOMEPROFILER_DEPS_ONLY=1 Rscript --vanilla /tmp/install.R
-COPY local_mpp /tmp/local_mpp
-
 
 # Fetch the application while building rather than vendoring it in this
-# packaging repository. ARGs keep the source overridable for development builds.
+# packaging repository. The fork's `galaxy-it-adaptations` branch carries the
+# send-to-Galaxy integration. ARGs keep the source overridable for development
+# builds.
 #
 # APP_REVISION is not decoration: a RUN layer is cached on its command string and
 # build args, and BuildKit cannot see that the remote branch moved. Cloning a
@@ -63,14 +63,12 @@ COPY local_mpp /tmp/local_mpp
 # commit makes the layer key change whenever the app changes.
 ARG APP_SOURCE=/opt/src/MicrobiomeProfiler
 ARG APP_REPOSITORY=https://github.com/paulzierep/MicrobiomeProfiler.git
-ARG APP_REF=galaxy-output
+ARG APP_REF=galaxy-it-adaptations
 ARG CACHE_BUSTER
 ARG APP_REVISION=branch
 RUN set -eux; \
     echo "CB=$CACHE_BUSTER"; \
-    if [ -d /tmp/local_mpp ]; then \
-        cp -r /tmp/local_mpp "$APP_SOURCE"; \
-    elif [ "$APP_REVISION" = "branch" ]; then \
+    if [ "$APP_REVISION" = "branch" ]; then \
         git clone --depth 1 --branch "$APP_REF" "$APP_REPOSITORY" "$APP_SOURCE"; \
     else \
         git init -q "$APP_SOURCE"; \

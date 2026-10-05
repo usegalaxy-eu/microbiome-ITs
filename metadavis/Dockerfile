@@ -86,10 +86,10 @@ RUN set -eux; \
 ENV CHROMOTE_CHROME=/usr/bin/google-chrome
 
 # The application is fetched while building rather than vendored in this
-# packaging repository. The fork's branch contains the Galaxy input and output
-# integration.
+# packaging repository. The fork's `galaxy-it-adaptations` branch carries the
+# Galaxy input format and the send-to-Galaxy integration.
 ARG APP_REPOSITORY=https://github.com/paulzierep/MetaDAVis.git
-ARG APP_REF=galaxy-input
+ARG APP_REF=galaxy-it-adaptations
 RUN git clone --depth 1 --branch "$APP_REF" "$APP_REPOSITORY" /opt/MetaDAVis \
     && rm -rf /opt/MetaDAVis/.git
 

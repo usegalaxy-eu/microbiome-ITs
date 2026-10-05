@@ -1,21 +1,27 @@
-# CMiNet is not vendored: the app is cloned into the build tree on demand
-# (see the `deps` target) and never committed.
+# CMiNet is not vendored. The image build clones the app itself inside the
+# Dockerfile, and `deps` clones a separate copy outside the repository for the
+# tests to read. Nothing app-related is ever written into this build tree.
 #
-# The default is the fork's `galaxy-integration` branch, which adds the
+# The default is the fork's `galaxy-it-adaptations` branch, which adds the
 # "Send to Galaxy" buttons, the history picker and the Galaxy input format to the
 # application. Override both variables to build plain upstream, e.g.
 #   make refresh_deps docker UPSTREAM_URL=https://github.com/solislemuslab/CMiNetShinyAPP UPSTREAM_REF=main
 UPSTREAM_URL=https://github.com/paulzierep/CMiNetShinyAPP
-UPSTREAM_REF=galaxy-integration
-UPSTREAM_DIR=CMiNetShinyAPP
+UPSTREAM_REF=galaxy-it-adaptations
+
+# Where `deps` keeps the checkout. Kept outside the repository on purpose: a
+# checkout inside the build tree is a file the Dockerfile could pick up, and it is
+# one `rm -rf` away from being committed by accident.
+DEPS_ROOT?=/tmp/microbiome-ITs
+UPSTREAM_DIR=$(DEPS_ROOT)/cminet/CMiNetShinyAPP
 UPSTREAM_SENTINEL=$(UPSTREAM_DIR)/galaxy_ie.R
 
 # These must produce the image the tool XML asks for
-# (<container type="docker">quay.io/paulzierep/cminet-gxit:latest</container>),
+# (<container type="docker">quay.io/galaxy/cminet-gxit:latest</container>),
 # otherwise Galaxy pulls the old published image from the registry instead of
 # using the image you just built locally.
 docker_name=cminet-gxit
-docker_repo=quay.io/paulzierep
+docker_repo=quay.io/galaxy
 # Must match <port> in gxit/interactivetool_cminet.xml and ARG PORT in the
 # Dockerfile.
 internal_port=8080
@@ -29,16 +35,17 @@ WEB_LATEST=${docker_repo}/${docker_name}:latest
 
 re:clean docker
 
-# Shallow clone of the app, checked in as a build input only. Written as a
-# .PHONY target rather than a file target so that a half-deleted or stale
-# checkout is repaired instead of being taken at face value.
+# Shallow clone of the app for the tests to read, outside the build tree. The
+# Dockerfile never sees this. Written as a .PHONY target rather than a file
+# target so that a half-deleted or stale checkout is repaired instead of being
+# taken at face value.
 .PHONY: deps
 deps:
 	@if [ -f "$(UPSTREAM_SENTINEL)" ]; then \
 	    echo "== $(UPSTREAM_DIR) is already there"; \
 	else \
-	    echo "== cloning $(UPSTREAM_URL) @ $(UPSTREAM_REF)"; \
-	    rm -rf "$(UPSTREAM_DIR)" && \
+	    echo "== cloning $(UPSTREAM_URL) @ $(UPSTREAM_REF) -> $(UPSTREAM_DIR)"; \
+	    mkdir -p "$(DEPS_ROOT)/cminet" && \
 	    git clone --depth 1 --branch "$(UPSTREAM_REF)" "$(UPSTREAM_URL)" "$(UPSTREAM_DIR)" && \
 	    rm -rf "$(UPSTREAM_DIR)/.git"; \
 	fi
@@ -95,9 +102,10 @@ smoke:
 
 # focused test of the Galaxy download registry and the history picker against the
 # real app checkout, with stubbed galaxy_ie_helpers commands. No Shiny session is
-# started, so this is quick and does not need a Galaxy.
-test-galaxy-ie:
-	docker run --rm -v "$(CURDIR)/CMiNetShinyAPP:/app:ro" -v "$(CURDIR)/tests:/tests:ro" \
+# started, so this is quick and does not need a Galaxy. Reads the deps checkout
+# the Dockerfile never sees.
+test-galaxy-ie: deps
+	docker run --rm -v "$(UPSTREAM_DIR):/app:ro" -v "$(CURDIR)/tests:/tests:ro" \
 	    --entrypoint Rscript $(docker_name):latest --vanilla /tests/galaxy_ie_test.R /app
 
 # everything that can be checked without starting the app

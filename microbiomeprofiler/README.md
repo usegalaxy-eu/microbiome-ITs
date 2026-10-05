@@ -43,7 +43,7 @@ tables) work offline; only the enrichment lookups need the network.
 ```
 
 The upstream repository is **not vendored**. The Dockerfile shallow-clones the
-`galaxy-output` branch from the application fork while building the image.
+`galaxy-it-adaptations` branch from the application fork while building the image.
 
 ## Build
 
@@ -72,7 +72,7 @@ make stop
 
 ## Register it in Galaxy
 
-1. `make docker` (builds and tags `quay.io/paulzierep/microbiomeprofiler-gxit:latest`).
+1. `make docker` (builds and tags `quay.io/galaxy/microbiomeprofiler-gxit:latest`).
 2. Copy `gxit/interactivetool_microbiomeprofiler.xml` into Galaxy's
    `tools/interactive/` directory.
 3. Enable interactive tools in `config/galaxy.yml`:
@@ -92,10 +92,15 @@ planemo serve --host 0.0.0.0 --port 8080 microbiomeprofiler/gxit/
 
 ## Results
 
-Like MetaDAVis, this is an export-oriented app: results are downloaded from the
-browser (per-module tables and plots, plus the session's own downloads) rather
-than written into the Galaxy history. No `<data>` outputs are declared, so the
-job ends cleanly whether or not the user ran an enrichment.
+Results are sent back into the Galaxy history rather than downloaded by hand: the
+app's download outputs are wired to `galaxy-ie-helpers` by the fork's
+`galaxy-it-adaptations` branch, and the tool XML declares a collection over
+`microbiomeprofiler_outputs`. The collection stays empty unless the user actually
+sends something, so the job ends cleanly either way.
+
+Because the app is installed as an R package, the upload runs without re-sourcing
+a helper file at runtime - everything it needs is passed to the background
+process instead.
 
 ## Citation
 

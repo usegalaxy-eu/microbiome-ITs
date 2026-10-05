@@ -1,18 +1,25 @@
-# MicrobiomeProfiler is not vendored: the upstream repository is cloned into the
-# build tree on demand (see the `deps` target) and never committed.
+# MicrobiomeProfiler is not vendored. The image build clones the app itself
+# inside the Dockerfile, and `deps` clones a separate copy outside the repository
+# for the tests to read. Nothing app-related is ever written into this build tree.
 UPSTREAM_URL=https://github.com/paulzierep/MicrobiomeProfiler
-# `main` is an almost empty stub (LICENSE only); the package lives on `devel`, which
-# is also the repository default branch.
-UPSTREAM_REF=galaxy-output
-UPSTREAM_DIR=MicrobiomeProfiler
+# The fork's `galaxy-it-adaptations` branch carries the send-to-Galaxy
+# integration. Plain upstream would be the `devel` branch, which is also the
+# repository default (`main` is an almost empty stub - LICENSE only).
+UPSTREAM_REF=galaxy-it-adaptations
+
+# Where `deps` keeps the checkout. Kept outside the repository on purpose: a
+# checkout inside the build tree is a file the Dockerfile could pick up, and it is
+# one `rm -rf` away from being committed by accident.
+DEPS_ROOT?=/tmp/microbiome-ITs
+UPSTREAM_DIR=$(DEPS_ROOT)/microbiomeprofiler/MicrobiomeProfiler
 UPSTREAM_SENTINEL=$(UPSTREAM_DIR)/DESCRIPTION
 
 # These must produce the image the tool XML asks for
-# (<container type="docker">paulzierep/microbiomeprofiler-gxit:latest</container>),
+# (<container type="docker">quay.io/galaxy/microbiomeprofiler-gxit:latest</container>),
 # otherwise Galaxy pulls the old published image from the registry instead of
 # using the image you just built locally.
 docker_name=microbiomeprofiler-gxit
-docker_repo=quay.io/paulzierep
+docker_repo=quay.io/galaxy
 # Must match <port> in gxit/interactivetool_microbiomeprofiler.xml and ARG PORT
 # in the Dockerfile.
 internal_port=8080
@@ -26,14 +33,15 @@ WEB_LATEST=${docker_repo}/${docker_name}:latest
 
 re:clean docker
 
-# Shallow clone of the upstream package, checked in as a build input only.
+# Shallow clone of the app for the tests to read, outside the build tree. The
+# Dockerfile never sees this.
 .PHONY: deps
 deps:
 	@if [ -f "$(UPSTREAM_SENTINEL)" ]; then \
 	    echo "== $(UPSTREAM_DIR) is already there"; \
 	else \
-	    echo "== cloning $(UPSTREAM_URL) @ $(UPSTREAM_REF)"; \
-	    rm -rf "$(UPSTREAM_DIR)" && \
+	    echo "== cloning $(UPSTREAM_URL) @ $(UPSTREAM_REF) -> $(UPSTREAM_DIR)"; \
+	    mkdir -p "$(DEPS_ROOT)/microbiomeprofiler" && \
 	    git clone --depth 1 --branch "$(UPSTREAM_REF)" "$(UPSTREAM_URL)" "$(UPSTREAM_DIR)" && \
 	    rm -rf "$(UPSTREAM_DIR)/.git"; \
 	fi

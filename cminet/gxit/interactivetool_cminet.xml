@@ -1,7 +1,7 @@
 <tool id="interactive_tool_cminet" tool_type="interactive" name="CMiNet" version="1.0.0">
     <description>Construct consensus microbiome networks from abundance tables</description>
     <requirements>
-        <container type="docker">quay.io/paulzierep/cminet-gxit:latest</container>
+        <container type="docker">quay.io/galaxy/cminet-gxit:latest</container>
     </requirements>
     <entry_points>
         <entry_point name="CMiNet" requires_domain="True">

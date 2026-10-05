@@ -32,13 +32,13 @@ on:
           - microbiomeprofiler
           - cminet
       tag:
-        description: Quay tag
+        description: Image tag to publish (the published image also gets :latest)
         required: true
         default: latest
         type: string
 
 env:
-  IMAGE_REGISTRY: quay.io
+  IMAGE_REPOSITORY: quay.io/galaxy
 
 jobs:
   changes:

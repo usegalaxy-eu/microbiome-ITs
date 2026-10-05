@@ -1,8 +1,10 @@
-# MetaDAVis itself IS part of the build context: the Dockerfile copies it to
-# /opt/MetaDAVis. Only its git metadata and editor droppings are excluded - the
-# upstream .git directory would otherwise add ~10 MB to the context and make the
-# COPY layer invalid every time a clone changes.
-MetaDAVis/.git
+# The app is cloned from git inside the Dockerfile, never copied out of the build
+# context, so everything the `deps` target leaves behind can be excluded. That
+# keeps a local checkout from silently becoming a build input and keeps the
+# context small.
+MetaDAVis/
+local_*/
+
 .git
 **/.Rhistory
 **/.RData

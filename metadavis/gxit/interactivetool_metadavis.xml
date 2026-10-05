@@ -1,7 +1,7 @@
 <tool id="interactive_tool_metadavis" tool_type="interactive" name="MetaDAVis" version="1.0.0">
     <description>Interactive analysis and visualization of 16S and whole-metagenome sequencing results</description>
     <requirements>
-        <container type="docker">quay.io/paulzierep/metadavis-gxit:latest</container>
+        <container type="docker">quay.io/galaxy/metadavis-gxit:latest</container>
     </requirements>
     <entry_points>
         <entry_point name="MetaDAVis" requires_domain="True">

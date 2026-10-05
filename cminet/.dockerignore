@@ -1,0 +1,10 @@
+# The app is cloned from git inside the Dockerfile, never copied out of the build
+# context, so everything the `deps` target leaves behind can be excluded. That
+# keeps a checkout from silently becoming a build input and keeps the context
+# small.
+CMiNetShinyAPP/
+local_*/
+
+.git
+**/.Rhistory
+**/.RData

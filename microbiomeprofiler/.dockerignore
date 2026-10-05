@@ -1,9 +1,10 @@
-# MicrobiomeProfiler itself IS part of the build context: the Dockerfile copies
-# it to /opt/src/MicrobiomeProfiler so that install.R can install it with
-# remotes::install_local(). Only its git metadata and editor droppings are
-# excluded - the upstream .git directory would otherwise add to the context and
-# invalidate the COPY layer on every fresh clone.
-MicrobiomeProfiler/.git
+# The app is cloned from git inside the Dockerfile, never copied out of the build
+# context, so everything the `deps` target leaves behind can be excluded. That
+# keeps a local checkout from silently becoming a build input and keeps the
+# context small.
+MicrobiomeProfiler/
+local_*/
+
 .git
 **/.Rhistory
 **/.RData
