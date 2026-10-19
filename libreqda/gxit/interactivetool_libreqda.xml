@@ -1,0 +1,103 @@
+<tool id="interactive_tool_libreqda" tool_type="interactive" name="LibreQDA" version="1.2.1">
+    <description>Qualitative data analysis: import documents, highlight and tag excerpts, export</description>
+    <requirements>
+        <container type="docker">quay.io/galaxy/libreqda-gxit:latest</container>
+    </requirements>
+    <entry_points>
+        <entry_point name="LibreQDA" requires_domain="True">
+            <port>7465</port>
+        </entry_point>
+    </entry_points>
+    <!-- No Galaxy inputs or outputs yet: the application starts empty and
+         everything (document import, coding, export) happens in the browser.
+         The sqlite database is placed in the job working directory so the
+         session is self-contained; nothing collects it back into the history
+         for now.
+
+         LibreQDA is started in "server" mode with a generated config that
+         sets UNIX_SOCKET: upstream treats that as "running behind a
+         pre-authenticating reverse proxy" and skips its app-level access
+         token (the token is otherwise printed once to stdout and must be
+         appended as ?token=... to open the session). In a Galaxy
+         interactive tool the authentication boundary is the Galaxy
+         interactive tool URL itself, so the token only adds friction.
+         Note this does NOT switch the listener to a unix socket - that
+         happens only when the unix_socket CLI option is passed - the app
+         keeps listening on TCP 0.0.0.0:7465.
+
+         The generated config also carries a small Galaxy adaptation shim,
+         applied only when UNIX_SOCKET is set (upstream behaviour is
+         untouched otherwise). Galaxy embeds the entry point in a cross
+         origin iframe, which defeats three upstream defaults:
+
+         1. Session cookies are emitted without SameSite, which browsers
+            treat as Lax. Lax cookies are never sent on a cross origin
+            iframe navigation, so the "no session yet, log in and redirect
+            to /" branch loops forever inside the iframe
+            (ERR_TOO_MANY_REDIRECTS). set_cookie now defaults to
+            SameSite=None + Secure.
+         2. In UNIX_SOCKET mode every request is pre-authenticated by the
+            trusted proxy, so get_current_user returns "admin" directly
+            instead of requiring a session cookie round trip. This also
+            keeps the app usable when a browser blocks third party cookies.
+         3. set_default_headers sends X-Frame-Options: DENY plus
+            frame-ancestors 'none' (clickjacking protection), which makes
+            browsers refuse to render inside the Galaxy iframe. Both are
+            relaxed so the embed is allowed; the unguessable interactive
+            tool host remains the access boundary. -->
+    <command detect_errors="exit_code"><![CDATA[
+        mkdir -p libreqda_data ;
+        export HOME=\$PWD/libreqda_data ;
+        python3 -c 'import os,secrets;db="sqlite:///"+os.path.join(os.getcwd(),"libreqda_data","libreqda.sqlite3");lines=["NAME = \x27LibreQDA\x27","PORT = 7465","BIND_ADDRESS = \x270.0.0.0\x27","SECRET_KEY = \x27%s\x27" % secrets.token_hex(32),"DATABASE = \x27%s\x27" % db,"TOS_FILE = None","X_HEADERS = False","EMAIL = \x27LibreQDA <noreply@localhost>\x27","MAIL_SERVER = dict(ssl=False, host=\x27localhost\x27, port=25)","COOKIES_PROMPT = False","MULTIUSER = False","UNIX_SOCKET = True","if UNIX_SOCKET:","    import tornado.web","    def _gxy_cookie(orig):","        def fix(self, name, value, *args, **kwargs):","            kwargs.setdefault(\x27samesite\x27, \x27None\x27)","            kwargs.setdefault(\x27secure\x27, True)","            return orig(self, name, value, *args, **kwargs)","        return fix","    tornado.web.RequestHandler.set_cookie = _gxy_cookie(tornado.web.RequestHandler.set_cookie)","    del _gxy_cookie, tornado","    import taguette.web.base as _gxy_base","    _gxy_base.BaseHandler.get_current_user = lambda self: \x27admin\x27","    def _gxy_frames(orig):","        def dh(self):","            orig(self)","            self.clear_header(\x27X-Frame-Options\x27)","            self.set_header(\x27Content-Security-Policy\x27, \x27frame-ancestors *\x27)","        return dh","    _gxy_base.BaseHandler.set_default_headers = _gxy_frames(_gxy_base.BaseHandler.set_default_headers)","    del _gxy_frames, _gxy_base"];open("libreqda_server_config.py","w").write("\n".join(lines))' ;
+        exec libreqda --no-browser server libreqda_server_config.py
+    ]]></command>
+    <tests>
+        <test expect_num_outputs="0"/>
+    </tests>
+    <help><![CDATA[
+`LibreQDA <https://gitlab.com/bin-cirst/libreqda/libre-qda>`_ is a free and
+open-source qualitative data analysis (QDA) tool developed by the Plateforme
+en humanités numériques (PHuN) at Université de Sherbrooke. It is a fork of
+`Taguette <https://taguette.org/>`_ with additions developed together with
+qualitative-analysis researchers: document collections, code hierarchies,
+overlaid coding stripes, drag-and-drop coding, an integrated search engine and
+faster multi-file import.
+
+.. class:: infomark
+
+**This is the plain application, running inside Galaxy.** The tool has no
+inputs and no outputs for now: the session starts with an empty project and
+you import your documents (PDF, DOCX, ODT, TXT, HTML, EPUB, MOBI, RTF) from
+the browser. Anything you download from the application (tagged excerpts,
+coded documents, exports for diffusion or post-processing) is saved through
+your browser as usual - it does not go to your Galaxy history yet.
+
+.. class:: warning
+
+The project database lives inside the interactive session. When the session
+ends, the session's data is gone - export your work from the application
+before stopping it.
+
+Citation: LibreQDA has no software paper yet; please cite the software via
+its repository (see citation) and mention the version used.
+]]>
+</help>
+    <citations>
+        <citation type="bibtex">@misc{libreqda,
+            author = {Dion, Jérémie and Legault, Ève and Claveau, François and Touré, Moussa and Boissonneault, Philippe},
+            title = {LibreQDA: qualitative data analysis software},
+            year = {2025},
+            publisher = {GitLab},
+            howpublished = {\url{https://gitlab.com/bin-cirst/libreqda/libre-qda}},
+            note = {Université de Sherbrooke, Plateforme en humanités numériques}
+        }</citation>
+        <citation type="bibtex">@misc{taguette,
+            author = {Rampin, Rémi and Vassiliadis, Vasileios and Santana, Cristiano and others},
+            title = {Taguette: a web-based text annotation platform},
+            year = {2020},
+            publisher = {Zenodo},
+            doi = {10.5281/zenodo.3964287},
+            note = {LibreQDA is a fork of Taguette}
+        }</citation>
+    </citations>
+</tool>
