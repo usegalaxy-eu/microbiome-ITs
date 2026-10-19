@@ -8,6 +8,7 @@ on:
       - 'microbiomeprofiler/**'
       - 'cminet/**'
       - 'miadash/**'
+      - 'libreqda/**'
   push:
     branches:
       - main
@@ -17,6 +18,7 @@ on:
       - 'microbiomeprofiler/**'
       - 'cminet/**'
       - 'miadash/**'
+      - 'libreqda/**'
   release:
     types:
       - published
@@ -34,6 +36,7 @@ on:
           - microbiomeprofiler
           - cminet
           - miadash
+          - libreqda
       tag:
         description: Image tag to publish (leave empty to auto-increment the latest published version; the image also gets :latest)
         required: false
@@ -52,6 +55,7 @@ jobs:
       microbiomeprofiler: ${{ steps.filter.outputs.microbiomeprofiler }}
       cminet: ${{ steps.filter.outputs.cminet }}
       miadash: ${{ steps.filter.outputs.miadash }}
+      libreqda: ${{ steps.filter.outputs.libreqda }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -73,6 +77,9 @@ jobs:
             miadash:
               - '.github/workflows/ci.yml'
               - 'miadash/**'
+            libreqda:
+              - '.github/workflows/ci.yml'
+              - 'libreqda/**'
 
   build-metadavis:
     needs: changes
@@ -110,6 +117,15 @@ jobs:
       image: miadash-gxit
       push: false
 
+  build-libreqda:
+    needs: changes
+    if: needs.changes.outputs.libreqda == 'true'
+    uses: ./.github/workflows/image.yml
+    with:
+      context: libreqda
+      image: libreqda-gxit
+      push: false
+
   # Computes the next version tag (e.g. 1.0.0 -> 1.0.1) from the version tags
   # already published on quay.io. Release jobs fall back to this whenever no
   # explicit tag was requested, so publishing never clobbers an existing tag.
@@ -124,6 +140,7 @@ jobs:
       microbiomeprofiler: ${{ steps.bump.outputs.microbiomeprofiler }}
       cminet: ${{ steps.bump.outputs.cminet }}
       miadash: ${{ steps.bump.outputs.miadash }}
+      libreqda: ${{ steps.bump.outputs.libreqda }}
     steps:
       - name: Compute next version tag per image
         id: bump
@@ -135,7 +152,7 @@ jobs:
           if [ -n "${QUAY_OAUTH_TOKEN:-}" ]; then
             auth=(-u '$oauthtoken:'"${QUAY_OAUTH_TOKEN}")
           fi
-          for image in metadavis microbiomeprofiler cminet miadash; do
+          for image in metadavis microbiomeprofiler cminet miadash libreqda; do
             tags=""
             for page in $(seq 1 20); do
               names=$(curl -sf "${auth[@]}" \
@@ -213,4 +230,18 @@ jobs:
       image: miadash-gxit
       push: true
       tag: ${{ github.event.client_payload.tag || (github.event_name == 'release' && github.event.release.tag_name) || inputs.tag || needs.next-tag.outputs.miadash }}
+    secrets: inherit
+
+  release-libreqda:
+    needs: next-tag
+    if: >-
+      github.event_name == 'release' ||
+      (github.event_name == 'repository_dispatch' && github.event.client_payload.image == 'libreqda') ||
+      (github.event_name == 'workflow_dispatch' && inputs.image == 'libreqda')
+    uses: ./.github/workflows/image.yml
+    with:
+      context: libreqda
+      image: libreqda-gxit
+      push: true
+      tag: ${{ github.event.client_payload.tag || (github.event_name == 'release' && github.event.release.tag_name) || inputs.tag || needs.next-tag.outputs.libreqda }}
     secrets: inherit
