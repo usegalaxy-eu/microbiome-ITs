@@ -1,6 +1,6 @@
 ---
 name: microbiome-its
-description: Develop and locally test Galaxy Interactive Tools (Shiny apps) in this repository — building/tagging the Docker image, running a dev Galaxy with planemo (the required --biocontainers flag), and validating an interactive-tool job end-to-end.
+description: Develop and locally test Galaxy Interactive Tools in this repository (Shiny apps, Python/Tornado apps, …) — building/tagging the Docker image, running a dev Galaxy with planemo (the required --biocontainers flag), and verifying an interactive-tool job end-to-end inside the real Galaxy UI.
 ---
 
 # Working on microbiome-ITs (Galaxy Interactive Tools)
@@ -73,6 +73,105 @@ matches the calling shell itself).
 - `make smoke` / `make test` — run the container standalone with test fixtures, assert on startup log + app HTTP 200 (`make check`).
 - `planemo lint <tool>/gxit/` — must be INFO/CHECK only.
 - `make startup-test` (where provided) — `MIADASH_STARTUP_ONLY=1`-style seam in the entrypoint; grep startup log with `grep -E "label: +path"` (whitespace-tolerant).
+
+## Verify in the real Galaxy UI (click-through probe)
+
+`curl` on the entry-point target only proves the app answers. Galaxy embeds the IT in a
+**cross-origin iframe**, and that is where browsers break apps: cookie policy and
+framing headers only matter in that context. Treat "opens in Galaxy" as its own test.
+
+The display route is **client-side only**: `GET /interactivetool_entry_points/<id>/display`
+returns `404 No route for …` — you must enter through
+`/interactivetool_entry_points/list` and click, exactly like a user.
+
+This skill ships a dependency-free probe (headless Chrome + DevTools Protocol, Node 22+):
+
+```sh
+# planemo serve already running and the IT launched in a history
+node .opencode/skills/microbiome-its/scripts/galaxy_it_probe.js \
+     http://127.0.0.1:8080 "miaDash"
+```
+
+```json
+{
+  "ok": true,
+  "title": "miaDash",
+  "href": "http://<id>-<token>.ep.interactivetool.localhost:<port>/",
+  "body": "…visible text of the embedded app…"
+}
+```
+
+`ok: true` means the iframe document actually **rendered** (title + visible text), not
+just that the host answered. The probe:
+
+1. launches `google-chrome --headless=new --remote-debugging-port=<port>`;
+2. navigates to `/interactivetool_entry_points/list` and clicks the IT row link
+   (`a[id^="link-"]` — not the toolbox entry `a.title-link`, not "Open in center panel");
+3. waits for the display route and finds the `iframe` CDP target at
+   `*.ep.interactivetool.<host>`;
+4. evaluates `document.title` / `location.href` / `document.body.innerText` inside it.
+
+**No extra Docker.** The only container is the IT image that `planemo serve --docker`
+launches; Chrome and Node run on the host.
+
+Manual equivalent: start Chrome with `--remote-debugging-port`, navigate to `/list`,
+click the row link, then `GET http://127.0.0.1:<port>/json/list` and connect to the
+`iframe` target's `webSocketDebuggerUrl`. A redirect loop appears as 20+
+`URL_REQUEST_START_JOB` events for the same URL in `--log-net-log=…`.
+
+### Relaunching after an XML edit
+
+Galaxy reloads the tool XML on change (`watch_tools`) without restarting serve, but the
+**running container keeps the old command** — stop and relaunch the entry point:
+
+```sh
+BASE=http://127.0.0.1:8080
+# API key: curl -s -c jar $BASE/ ; uid=$(curl -s -b jar $BASE/api/users | jq -r '.[0].id')
+#          key=$(curl -s -X POST -b jar $BASE/api/users/$uid/api_key | tr -d '"')
+curl -s -X DELETE -H "x-api-key: $KEY" $BASE/api/entry_points/<id>
+curl -s -X POST  -H "x-api-key: $KEY" -H 'Content-Type: application/json' \
+     -d '{"tool_id":"interactive_tool_<tool>","history_id":"<hid>"}' $BASE/api/tools
+curl -s -H "x-api-key: $KEY" "$BASE/api/entry_points?running=true"   # poll until it appears
+```
+
+### Cross-origin traps (these bite any non-Galaxy app)
+
+- **`SameSite=Lax` cookies → infinite redirect loop.** Cookies without `SameSite` are
+  treated as `Lax`, and Lax cookies are *not sent on cross-site iframe navigations*.
+  Apps that do "no session → log in → redirect to `/`" loop forever
+  (`ERR_TOO_MANY_REDIRECTS`) inside the iframe while working fine as a top-level page.
+  Emit `SameSite=None; Secure` (Chrome requires `Secure` with `None`, and accepts
+  `Secure` over plain HTTP on `*.localhost`), and where the app already assumes a
+  trusted pre-authenticating proxy, make auth cookie-free.
+- **`X-Frame-Options: DENY` / `Content-Security-Policy: frame-ancestors 'none'`** →
+  the frame never renders. `SAMEORIGIN` is not enough: the parent is cross-origin.
+  Relax or drop both.
+- Check the headers before blaming the browser:
+  ```sh
+  H="<id>-<token>.ep.interactivetool.localhost"; P=<proxy-port>
+  curl -sD- -o /dev/null --resolve "$H:$P:127.0.0.1" "http://$H:$P/" \
+    | grep -iE 'x-frame|content-security|set-cookie'
+  ```
+- Keep the image stock and adapt in the generated runtime config from the IT
+  `<command>` (Python apps often `exec()` their config, so the config file can carry a
+  small monkey-patch). Gate the patch on the app's proxy flag so upstream defaults
+  apply elsewhere — see `libreqda/gxit/interactivetool_libreqda.xml`.
+
+## Lessons learned (LibreQDA port, 2026-10)
+
+- **Pre-built upstream images**: don't fork the app. `FROM <upstream>`, override
+  `ENTRYPOINT ["tini","--"]` + `CMD []`, and do everything Galaxy-specific in the IT
+  XML `<command>`.
+- **Token-free single-user apps**: apps that print a one-time access token can be put
+  in "behind a pre-authenticating reverse proxy" mode from a generated config
+  (LibreQDA: `UNIX_SOCKET = True`, which also lets the app pre-authenticate requests).
+- **Generated config is a patch point**: LibreQDA's `main.py` `exec()`s the config
+  file, so the `<command>` writes a small shim there (SameSite cookies, cookie-free
+  auth, frame headers). Gate on the proxy flag.
+- **XML comments must not contain `--`** (breaks Galaxy tool parsing), and Galaxy joins
+  `<command>` CDATA lines with spaces — keep it a single logical line with `;`.
+- **Cheetah escaping**: shell variables need `\$VAR`, and quotes inside a
+  `python3 -c '…'` string are easiest as `\x27`.
 
 ## Lessons learned (miaDash port, 2026-10)
 

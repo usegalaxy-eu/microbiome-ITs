@@ -12,6 +12,7 @@ build, run and register it:
 | [`microbiomeprofiler/`](microbiomeprofiler/) | [YuLab-SMU/MicrobiomeProfiler](https://github.com/YuLab-SMU/MicrobiomeProfiler) | [paulzierep/MicrobiomeProfiler](https://github.com/paulzierep/MicrobiomeProfiler/tree/galaxy-it-adaptations) | `quay.io/galaxy/microbiomeprofiler-gxit` |
 | [`cminet/`](cminet/) | [solislemuslab/CMiNetShinyAPP](https://github.com/solislemuslab/CMiNetShinyAPP) | [paulzierep/CMiNetShinyAPP](https://github.com/paulzierep/CMiNetShinyAPP/tree/galaxy-it-adaptations) | `quay.io/galaxy/cminet-gxit` |
 | [`miadash/`](miadash/) | [microbiome/miaDash](https://github.com/microbiome/miaDash) | [paulzierep/miaDash](https://github.com/paulzierep/miaDash/tree/galaxy-it-adaptations) | `quay.io/galaxy/miadash-gxit` |
+| [`libreqda/`](libreqda/) | [bin-cirst/libreqda/libre-qda](https://gitlab.com/bin-cirst/libreqda/libre-qda) | *none - used as-is from upstream's own image* | `quay.io/galaxy/libreqda-gxit` |
 
 > **⚠ License pending for two tools.** Neither upstream ships a license file yet,
 > which means we have no explicit permission to redistribute their code inside
@@ -50,6 +51,12 @@ preceded them (`galaxy-input`, `galaxy-output`, `galaxy-integration`); those
 earlier branches are kept as-is. `galaxy-it-adaptations` is the one branch the
 Dockerfiles build from, so a single place controls what Galaxy runs for every
 tool.
+
+`libreqda` is the exception to the fork pattern: upstream publishes its own
+container image (`phunudes/libreqda`, built by the app's own CI), so the
+Dockerfile there only resets the image's entrypoint and no application fork
+exists. Its wrapper currently has no Galaxy inputs or outputs either - the
+tool is the plain application running inside Galaxy.
 
 The build never reads a local checkout: each Dockerfile clones the fork at build
 time, so a forked app's change shows up in the image without anything being
@@ -144,6 +151,7 @@ normal way to publish a new image:
 | `microbiomeprofiler` | `quay.io/galaxy/microbiomeprofiler-gxit:<tag>` and `:latest` |
 | `cminet` | `quay.io/galaxy/cminet-gxit:<tag>` and `:latest` |
 | `miadash` | `quay.io/galaxy/miadash-gxit:<tag>` and `:latest` |
+| `libreqda` | `quay.io/galaxy/libreqda-gxit:<tag>` and `:latest` |
 
 Leave the `tag` input **empty** and the workflow auto-increments the version
 instead: it reads the version tags already published on `quay.io/galaxy` for the
