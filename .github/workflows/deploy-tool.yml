@@ -1,16 +1,22 @@
 name: Deploy interactive tool to usegalaxy.eu
 
-# Copies a tool's Galaxy wrapper into usegalaxy-eu/galaxy (tools/interactive/)
-# and opens a pull request there. The image is checked first: a wrapper that
-# points at an unpublished container would only fail on the server, so this
-# workflow refuses to open the PR until the registry has the image.
+# Copies a tool's Galaxy wrapper into a branch on a fork of
+# usegalaxy-eu/galaxy. The workflow never touches usegalaxy-eu/galaxy and does
+# not open a pull request: it prints a compare URL that opens the PR with one
+# click, so it only needs write access to the fork.
+#
+# The image is checked first: a wrapper that points at an unpublished container
+# would only fail on the server, so the job stops before it pushes anything.
+#
+# Requires the FORK_PUSH_TOKEN secret: a token with Contents: read and write on
+# the fork only (fine-grained PAT), e.g. paulzierep/galaxy.
+#
+# The fork must already have the target branch (the branch is extended, not
+# recreated), so a fork whose branch is missing has to be refreshed once.
 #
 # The tool panel entry is still a separate change in
 # usegalaxy-eu/infrastructure-playbook
-# (templates/galaxy/config/tool_conf.xml.j2); the PR body carries the line to add.
-#
-# Requires the USEGALAXY_EU_TOKEN secret: a token that can push branches and
-# open pull requests in usegalaxy-eu/galaxy.
+# (templates/galaxy/config/tool_conf.xml.j2); the summary carries the line.
 
 on:
   workflow_dispatch:
@@ -27,8 +33,13 @@ on:
           - microbiomeprofiler
           - all
         default: libreqda
+      fork:
+        description: Fork of usegalaxy-eu/galaxy that receives the branch
+        required: true
+        default: paulzierep/galaxy
+        type: string
       target_branch:
-        description: Branch of usegalaxy-eu/galaxy to open the pull request against
+        description: Branch of usegalaxy-eu/galaxy the pull request should target
         required: true
         default: release_26.1_europe
         type: string
@@ -42,7 +53,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-${{ inputs.tool }}-${{ inputs.target_branch }}
+  group: deploy-${{ inputs.tool }}-${{ inputs.fork }}-${{ inputs.target_branch }}
   cancel-in-progress: false
 
 jobs:
@@ -79,6 +90,7 @@ jobs:
       TOOL: ${{ matrix.tool }}
       XML: ${{ matrix.tool }}/gxit/interactivetool_${{ matrix.tool }}.xml
       BRANCH: add-it-${{ matrix.tool }}
+      FORK_REPO: ${{ inputs.fork }}
       TARGET_REPO: usegalaxy-eu/galaxy
       TARGET_BRANCH: ${{ inputs.target_branch }}
       DRY_RUN: ${{ inputs.dry_run }}
@@ -145,26 +157,42 @@ jobs:
           digest=$(jq -r '.tags[0].manifest_digest' registry.json)
           echo "Image ${IMAGE} is published (${digest})"
 
-      - name: Copy the XML into the target repository
+      - name: Create the branch in the fork
         id: prepare
         env:
-          TOKEN: ${{ secrets.USEGALAXY_EU_TOKEN }}
+          TOKEN: ${{ secrets.FORK_PUSH_TOKEN }}
         run: |
           set -euo pipefail
           if [ -n "${TOKEN:-}" ]; then
-            url="https://x-access-token:${TOKEN}@github.com/${TARGET_REPO}.git"
+            url="https://x-access-token:${TOKEN}@github.com/${FORK_REPO}.git"
           elif [ "$DRY_RUN" = "true" ]; then
-            url="https://github.com/${TARGET_REPO}.git"
+            url="https://github.com/${FORK_REPO}.git"
           else
-            echo "::error::The USEGALAXY_EU_TOKEN secret is not set (needs write access to ${TARGET_REPO})"
+            echo "::error::The FORK_PUSH_TOKEN secret is not set (it needs Contents: read and write on ${FORK_REPO})"
             exit 1
           fi
-          git clone --depth 1 --filter=blob:none --sparse \
-            --branch "$TARGET_BRANCH" "$url" target
+
+          # The branch is built on top of the fork's own copy of the target
+          # branch: that keeps the push to a single commit, and a fork that
+          # never fetched the upstream branch does not have to transfer its
+          # whole history.
+          rm -rf target
+          if ! git clone --quiet --filter=blob:none --sparse --single-branch \
+                 --branch "$TARGET_BRANCH" "$url" target 2> clone.err; then
+            cat clone.err >&2
+            echo "::error::${FORK_REPO} has no branch ${TARGET_BRANCH}, so there is nothing to build on. Create it once in the fork, then re-run: fork usegalaxy-eu/galaxy again, or locally: git clone git@github.com:${FORK_REPO}.git galaxy && cd galaxy && git remote add upstream https://github.com/${TARGET_REPO}.git && git fetch upstream ${TARGET_BRANCH} && git push origin FETCH_HEAD:${TARGET_BRANCH}"
+            exit 1
+          fi
           cd target
           git sparse-checkout set tools/interactive
-          git config user.name "usegalaxy-eu bot"
-          git config user.email "devnull@usegalaxy-eu.org"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          base=$(git rev-parse HEAD)
+          echo "base: ${base:0:12} on ${FORK_REPO}@${TARGET_BRANCH}"
+          upstream_tip=$(git ls-remote "https://github.com/${TARGET_REPO}.git" "refs/heads/${TARGET_BRANCH}" | cut -f1)
+          if [ -n "$upstream_tip" ] && [ "$upstream_tip" != "$base" ]; then
+            echo "::warning title=Fork branch is not up to date::${FORK_REPO}@${TARGET_BRANCH} is at ${base:0:12}, ${TARGET_REPO} is at ${upstream_tip:0:12}. The pull request still adds only this tool, but sync the fork branch if you want an up-to-date base."
+          fi
 
           destination="tools/interactive/$(basename "$XML")"
           cp "../$XML" "$destination"
@@ -172,16 +200,16 @@ jobs:
 
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "${TARGET_BRANCH} already has an identical $(basename "$destination"), nothing to do"
+            echo "${BRANCH} already contains an identical $(basename "$destination"), nothing to do"
             exit 0
           fi
 
-          git --no-pager diff --cached --stat
           echo "changed=true" >> "$GITHUB_OUTPUT"
+          git --no-pager diff --cached --stat
 
           if [ "$DRY_RUN" = "true" ]; then
             {
-              echo "### ${TOOL}: would open a pull request against ${TARGET_REPO}@${TARGET_BRANCH}"
+              echo "### ${TOOL}: would push ${BRANCH} to ${FORK_REPO}"
               echo
               echo '```diff'
               git --no-pager diff --cached
@@ -190,49 +218,45 @@ jobs:
             exit 0
           fi
 
-          git checkout -b "$BRANCH"
-          git commit -m "Add the ${TOOL} interactive tool"
-          git push --force origin "$BRANCH"
+          git switch -c "$BRANCH"
+          git commit -q -m "Add the ${TOOL} interactive tool"
+          git push --force origin "HEAD:refs/heads/${BRANCH}"
 
-      - name: Open or update the pull request
+      - name: Print the pull request link
         if: steps.prepare.outputs.changed == 'true' && env.DRY_RUN != 'true'
         env:
-          GH_TOKEN: ${{ secrets.USEGALAXY_EU_TOKEN }}
           TOOL_ID: ${{ steps.xml.outputs.tool_id }}
           IMAGE: ${{ steps.xml.outputs.image }}
         run: |
           set -euo pipefail
+          fork_owner="${FORK_REPO%%/*}"
+          url="https://github.com/${TARGET_REPO}/compare/${TARGET_BRANCH}...${fork_owner}:${BRANCH}?expand=1"
           xml_name=$(basename "$XML")
-          body=$(mktemp)
-          cat > "$body" <<EOF
-          Adds tools/interactive/${xml_name} to the interactive tools collection.
-
-          - Tool id: ${TOOL_ID}
-          - Container image: ${IMAGE} (checked to be published before this pull request was opened)
-          - Source: https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/${XML}
-
-          The XML is copied unchanged from usegalaxy-eu/microbiome-ITs by
-          .github/workflows/deploy-tool.yml in that repository.
-
-          Tool panel registration is a separate change in usegalaxy-eu/infrastructure-playbook
-          (templates/galaxy/config/tool_conf.xml.j2):
-
-              <tool file="interactive/${xml_name}" />
-          EOF
-
-          number=$(gh pr list --repo "$TARGET_REPO" --head "$BRANCH" --base "$TARGET_BRANCH" \
-            --state open --json number --jq '.[0].number // empty')
-          if [ -n "$number" ]; then
-            gh pr edit "$number" --repo "$TARGET_REPO" --body-file "$body"
-            url=$(gh pr view "$number" --repo "$TARGET_REPO" --json url --jq .url)
-            echo "Updated pull request: $url"
-          else
-            url=$(gh pr create --repo "$TARGET_REPO" --base "$TARGET_BRANCH" --head "$BRANCH" \
-              --title "Add the ${TOOL} interactive tool" --body-file "$body")
-            echo "Opened pull request: $url"
-          fi
           {
             echo "### ${TOOL}"
             echo
-            echo "$url"
+            echo "Branch ${BRANCH} pushed to ${FORK_REPO}."
+            echo
+            echo "Open the pull request: <${url}>"
+            echo
+            echo "Suggested title: \`Add the ${TOOL} interactive tool\`"
+            echo
+            echo "Suggested description:"
+            echo
+            echo '```markdown'
+            echo "Adds tools/interactive/${xml_name} to the interactive tools collection."
+            echo
+            echo "- Tool id: ${TOOL_ID}"
+            echo "- Container image: ${IMAGE} (checked to be published before the branch was pushed)"
+            echo "- Source: https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/${XML}"
+            echo
+            echo "The XML is copied unchanged from usegalaxy-eu/microbiome-ITs by"
+            echo ".github/workflows/deploy-tool.yml in that repository."
+            echo
+            echo "Tool panel registration is a separate change in usegalaxy-eu/infrastructure-playbook"
+            echo "(templates/galaxy/config/tool_conf.xml.j2):"
+            echo
+            echo "    <tool file=\"interactive/${xml_name}\" />"
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice title=Pull request for ${TOOL}::${url}"

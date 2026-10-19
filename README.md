@@ -198,25 +198,33 @@ wrapper from its own checkout, so the XML also has to be added to
 [`usegalaxy-eu/galaxy`](https://github.com/usegalaxy-eu/galaxy) under
 `tools/interactive/`.
 
-**Actions → Deploy interactive tool to usegalaxy.eu → Run workflow** does that
-for one tool (or `all`):
+**Actions → Deploy interactive tool to usegalaxy.eu → Run workflow** prepares the
+change on a branch of a fork and prints a one-click compare link; the pull
+request itself is opened by hand:
 
 1. **Validate** the XML: `tool_type="interactive"`, id `interactive_tool_<tool>`,
    exactly one container and at least one port.
 2. **Check the image is published**: the container reference from the XML is
-   looked up on quay.io. If the tag does not exist the job stops before any PR is
-   opened - a wrapper whose image is missing would only fail on the server.
-3. **Copy the XML** into `tools/interactive/` of a sparse checkout of the target
-   branch and push it as `add-it-<tool>`.
-4. **Open or update the pull request** against the target branch (default
-   `release_26.1_europe`). Re-running the workflow updates the same PR.
+   looked up on quay.io. If the tag does not exist the job stops before anything
+   is pushed - a wrapper whose image is missing would only fail on the server.
+3. **Create the branch** `add-it-<tool>` in the fork (`fork` input, default
+   `paulzierep/galaxy`) on top of the fork's copy of `target_branch`, with
+   `tools/interactive/interactivetool_<tool>.xml` added.
+4. **Print the compare URL** for `usegalaxy-eu/galaxy` plus a ready-to-paste PR
+   title and description in the run summary.
 
-`dry_run: true` runs steps 1-3 and prints the diff without pushing (this also
-works without credentials, since the checkout stays anonymous).
+The workflow never writes to `usegalaxy-eu/galaxy`. It needs the
+`FORK_PUSH_TOKEN` secret: a fine-grained PAT with **Contents: Read and write** on
+the fork only. `QUAY_OAUTH_TOKEN` is optional and only used to authenticate the
+registry lookup. Re-running the workflow force-updates the same branch;
+`dry_run: true` prints the diff without pushing (this also works without
+credentials, since the checkout stays anonymous).
 
-The workflow needs the `USEGALAXY_EU_TOKEN` secret: a token with write access to
-`usegalaxy-eu/galaxy` (push branches and open pull requests). `QUAY_OAUTH_TOKEN`
-is optional and only used to authenticate the registry lookup.
+The fork has to contain `target_branch` already - the workflow extends that
+branch instead of recreating it, which keeps the push to a single commit. If the
+branch is missing, the job fails with the exact commands to create it once; if it
+is merely behind, the run warns and still adds only the tool.
+
 
 After the galaxy PR is merged, the wrapper needs a tool panel entry in
 [`usegalaxy-eu/infrastructure-playbook`](https://github.com/usegalaxy-eu/infrastructure-playbook)
