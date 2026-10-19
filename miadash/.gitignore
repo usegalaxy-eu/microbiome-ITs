@@ -1,0 +1,15 @@
+# Ignore the app checkout the `deps` target clones into the build tree; it is a
+# build input only and must never be committed.
+/miaDash/
+
+# Galaxy job working directories, when the image is run standalone with
+# MIADASH_JOB_DIR pointing inside the build tree.
+/miadash_inputs/
+/miadash_outputs/
+/miadash_startup.txt
+.startup-job/
+
+# Image build artefacts
+*.tar
+*.tar.gz
+.password
