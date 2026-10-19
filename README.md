@@ -11,6 +11,7 @@ build, run and register it:
 | [`metadavis/`](metadavis/) | [GudaLab/MetaDAVis](https://github.com/GudaLab/MetaDAVis) | [paulzierep/MetaDAVis](https://github.com/paulzierep/MetaDAVis/tree/galaxy-it-adaptations) | `quay.io/galaxy/metadavis-gxit` |
 | [`microbiomeprofiler/`](microbiomeprofiler/) | [YuLab-SMU/MicrobiomeProfiler](https://github.com/YuLab-SMU/MicrobiomeProfiler) | [paulzierep/MicrobiomeProfiler](https://github.com/paulzierep/MicrobiomeProfiler/tree/galaxy-it-adaptations) | `quay.io/galaxy/microbiomeprofiler-gxit` |
 | [`cminet/`](cminet/) | [solislemuslab/CMiNetShinyAPP](https://github.com/solislemuslab/CMiNetShinyAPP) | [paulzierep/CMiNetShinyAPP](https://github.com/paulzierep/CMiNetShinyAPP/tree/galaxy-it-adaptations) | `quay.io/galaxy/cminet-gxit` |
+| [`miadash/`](miadash/) | [microbiome/miaDash](https://github.com/microbiome/miaDash) | [paulzierep/miaDash](https://github.com/paulzierep/miaDash/tree/galaxy-it-adaptations) | `quay.io/galaxy/miadash-gxit` |
 
 ## Application forks
 
@@ -29,11 +30,13 @@ upstream app, and all Galaxy adaptations live on a single branch in each fork:
 | [paulzierep/MetaDAVis](https://github.com/paulzierep/MetaDAVis/tree/galaxy-it-adaptations) | [`galaxy-it-adaptations`](https://github.com/paulzierep/MetaDAVis/tree/galaxy-it-adaptations) | A **"Galaxy input"** file format (OTU table + taxonomy + metadata staged by the tool) alongside the app's own input, and the **send-to-Galaxy** download handler. |
 | [paulzierep/MicrobiomeProfiler](https://github.com/paulzierep/MicrobiomeProfiler/tree/galaxy-it-adaptations) | [`galaxy-it-adaptations`](https://github.com/paulzierep/MicrobiomeProfiler/tree/galaxy-it-adaptations) | The **send-to-Galaxy** button for the app's download outputs. Needed in particular because the app is installed as an R package, where the async upload cannot re-source a helper file at runtime. |
 | [paulzierep/CMiNetShinyAPP](https://github.com/paulzierep/CMiNetShinyAPP/tree/galaxy-it-adaptations) | [`galaxy-it-adaptations`](https://github.com/paulzierep/CMiNetShinyAPP/tree/galaxy-it-adaptations) | The **"Send to Galaxy"** buttons, the **import-from-history** picker, and the **Galaxy input** format for the abundance matrix and the weighted network. |
+| [paulzierep/miaDash](https://github.com/paulzierep/miaDash/tree/galaxy-it-adaptations) | [`galaxy-it-adaptations`](https://github.com/paulzierep/miaDash/tree/galaxy-it-adaptations) | The **"Send to Galaxy"** buttons (with an id allow-list, so iSEE's own internal download links are left alone) and the **staged raw-table import** that starts the session from the abundance/colData/rowData/tree the tool form was given. No history picker: every miaDash input is a browser `fileInput`, which cannot be filled programmatically. This branch is cut from upstream `devel`. |
 
-All three branches are cut from the corresponding fork branch that preceded them
-(`galaxy-input`, `galaxy-output`, `galaxy-integration`); those earlier branches
-are kept as-is. `galaxy-it-adaptations` is the one branch the Dockerfiles build
-from, so a single place controls what Galaxy runs for every tool.
+All three original branches are cut from the corresponding fork branch that
+preceded them (`galaxy-input`, `galaxy-output`, `galaxy-integration`); those
+earlier branches are kept as-is. `galaxy-it-adaptations` is the one branch the
+Dockerfiles build from, so a single place controls what Galaxy runs for every
+tool.
 
 The build never reads a local checkout: each Dockerfile clones the fork at build
 time, so a forked app's change shows up in the image without anything being
@@ -42,7 +45,7 @@ committed here.
 ## Quick start
 
 ```bash
-cd metadavis           # or: cd microbiomeprofiler, or: cd cminet
+cd metadavis           # or: cd microbiomeprofiler, cminet, miadash
 make docker            # build + tag the image
 ```
 
@@ -79,7 +82,7 @@ tests/                             # optional; run with `make test-fast`
 ## Adding another tool
 
 1. `mkdir <tool> && cd <tool>`, then copy the layout above.
-2. Fork the application, put the Galaxy adaptations on a branch (here all three
+2. Fork the application, put the Galaxy adaptations on a branch (here all four
    use `galaxy-it-adaptations`), and point `UPSTREAM_URL` / `UPSTREAM_REF` /
    `UPSTREAM_SENTINEL` at that fork and branch. Pick a sentinel file that only
    exists on the Galaxy branch, so `make deps` can tell an adapted checkout from
@@ -127,6 +130,7 @@ normal way to publish a new image:
 | `metadavis` | `quay.io/galaxy/metadavis-gxit:<tag>` and `:latest` |
 | `microbiomeprofiler` | `quay.io/galaxy/microbiomeprofiler-gxit:<tag>` and `:latest` |
 | `cminet` | `quay.io/galaxy/cminet-gxit:<tag>` and `:latest` |
+| `miadash` | `quay.io/galaxy/miadash-gxit:<tag>` and `:latest` |
 
 The same happens automatically when a GitHub **release** is published.
 
@@ -143,9 +147,9 @@ event, which is the way to publish after changing a fork:
 {"event_type":"image-release","client_payload":{"image":"metadavis","tag":"1.0.0"}}
 ```
 
-Use `microbiomeprofiler` or `cminet` for those images. Sending this event from
-another repository requires a token with permission to dispatch workflows in this
-repository.
+Use `microbiomeprofiler`, `cminet` or `miadash` for those images. Sending this
+event from another repository requires a token with permission to dispatch
+workflows in this repository.
 
 Docker Hub helpers remain available in each tool Makefile for manual publishing:
 
@@ -162,5 +166,5 @@ The password can also be read from a `.password` file in the tool directory
   hand: the images ship `galaxy-ie-helpers`, and each tool XML declares a
   collection over its outputs directory. See the per-tool READMEs for the details.
 - MicrobiomeProfiler needs outbound internet access at runtime (KEGG REST,
-  eggNOG, SMPDB, Disbiome, HMDB). MetaDAVis is self-contained; CMiNet needs
-  internet only for its optional lookups.
+  eggNOG, SMPDB, Disbiome, HMDB). MetaDAVis and miaDash are self-contained; CMiNet
+  needs internet only for its optional lookups.
