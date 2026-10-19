@@ -17,6 +17,8 @@ LABEL org.opencontainers.image.title="miaDash" \
 #   reports "DONE" and then requireNamespace() fails with a missing .so, which
 #   would only show up as an empty panel in an interactive session. The
 #   verification step in docker/install.R is what catches that at build time.
+# - libgsl-dev: DirichletMultinomial (mia's dependency) has no binary build and
+#   compiles against the GSL headers (gsl/gsl_rng.h, gsl-config).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
@@ -35,6 +37,7 @@ RUN apt-get update \
         libglpk40 \
         libglib2.0-0 \
         libgmp10 \
+        libgsl-dev \
         cmake \
         pkg-config \
         fonts-dejavu-core \
