@@ -78,10 +78,8 @@ RUN MIADASH_DEPS_ONLY=1 Rscript --vanilla /tmp/install.R
 ARG APP_SOURCE=/opt/src/miaDash
 ARG APP_REPOSITORY=https://github.com/paulzierep/miaDash.git
 ARG APP_REF=galaxy-it-adaptations
-ARG CACHE_BUSTER
 ARG APP_REVISION=branch
 RUN set -eux; \
-    echo "CB=$CACHE_BUSTER"; \
     if [ "$APP_REVISION" = "branch" ]; then \
         git clone --depth 1 --branch "$APP_REF" "$APP_REPOSITORY" "$APP_SOURCE"; \
     else \
