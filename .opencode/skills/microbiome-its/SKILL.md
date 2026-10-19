@@ -157,6 +157,27 @@ curl -s -H "x-api-key: $KEY" "$BASE/api/entry_points?running=true"   # poll unti
   small monkey-patch). Gate the patch on the app's proxy flag so upstream defaults
   apply elsewhere — see `libreqda/gxit/interactivetool_libreqda.xml`.
 
+## Deploying to usegalaxy.eu
+
+The image and the wrapper ship separately: quay gets the image, and
+[`usegalaxy-eu/galaxy`](https://github.com/usegalaxy-eu/galaxy) gets the XML under
+`tools/interactive/`. **Actions → Deploy interactive tool to usegalaxy.eu → Run
+workflow** does the checks and opens the PR:
+
+1. validates the XML (interactive, expected tool id, one container, one port);
+2. looks the container tag up on quay.io and **stops if the image is not
+   published** - never deploy a wrapper whose image is missing;
+3. sparse-clones the target branch, copies `interactivetool_<tool>.xml` into
+   `tools/interactive/` and pushes `add-it-<tool>`;
+4. opens or updates the pull request (one per tool; pick `tool: all` to loop).
+
+Needs the `USEGALAXY_EU_TOKEN` secret (write access to `usegalaxy-eu/galaxy`);
+`dry_run: true` prints the diff without credentials.
+
+The tool panel entry stays manual: after the PR merges, add
+`<tool file="interactive/interactivetool_<tool>.xml" />` to
+`templates/galaxy/config/tool_conf.xml.j2` in `usegalaxy-eu/infrastructure-playbook`.
+
 ## Lessons learned (LibreQDA port, 2026-10)
 
 - **Pre-built upstream images**: don't fork the app. `FROM <upstream>`, override

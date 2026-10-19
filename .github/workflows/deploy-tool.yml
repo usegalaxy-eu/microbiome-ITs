@@ -1,0 +1,238 @@
+name: Deploy interactive tool to usegalaxy.eu
+
+# Copies a tool's Galaxy wrapper into usegalaxy-eu/galaxy (tools/interactive/)
+# and opens a pull request there. The image is checked first: a wrapper that
+# points at an unpublished container would only fail on the server, so this
+# workflow refuses to open the PR until the registry has the image.
+#
+# The tool panel entry is still a separate change in
+# usegalaxy-eu/infrastructure-playbook
+# (templates/galaxy/config/tool_conf.xml.j2); the PR body carries the line to add.
+#
+# Requires the USEGALAXY_EU_TOKEN secret: a token that can push branches and
+# open pull requests in usegalaxy-eu/galaxy.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tool:
+        description: Tool XML to deploy
+        required: true
+        type: choice
+        options:
+          - libreqda
+          - miadash
+          - cminet
+          - metadavis
+          - microbiomeprofiler
+          - all
+        default: libreqda
+      target_branch:
+        description: Branch of usegalaxy-eu/galaxy to open the pull request against
+        required: true
+        default: release_26.1_europe
+        type: string
+      dry_run:
+        description: Validate the XML and the image, print the diff, do not push
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ inputs.tool }}-${{ inputs.target_branch }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      tools: ${{ steps.tools.outputs.list }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve the tool list
+        id: tools
+        env:
+          PICKED: ${{ inputs.tool }}
+        run: |
+          set -euo pipefail
+          if [ "$PICKED" = "all" ]; then
+            list=$(for dir in */gxit; do basename "$(dirname "$dir")"; done | sort | jq -R . | jq -s -c .)
+          else
+            list=$(jq -nc --arg tool "$PICKED" '[$tool]')
+          fi
+          echo "Deploying: $list"
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Deploy ${{ matrix.tool }}
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tool: ${{ fromJson(needs.plan.outputs.tools) }}
+    env:
+      TOOL: ${{ matrix.tool }}
+      XML: ${{ matrix.tool }}/gxit/interactivetool_${{ matrix.tool }}.xml
+      BRANCH: add-it-${{ matrix.tool }}
+      TARGET_REPO: usegalaxy-eu/galaxy
+      TARGET_BRANCH: ${{ inputs.target_branch }}
+      DRY_RUN: ${{ inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate the tool XML
+        id: xml
+        run: |
+          set -euo pipefail
+          if [ ! -f "$XML" ]; then
+            echo "::error::$XML does not exist in this repository"
+            exit 1
+          fi
+          python3 - "$XML" "interactive_tool_${TOOL}" <<'PY'
+          import os
+          import sys
+          import xml.etree.ElementTree as ET
+
+          path, expected_id = sys.argv[1], sys.argv[2]
+          root = ET.parse(path).getroot()
+          assert root.tag == "tool", f"{path}: expected a <tool> root, found <{root.tag}>"
+          assert root.get("tool_type") == "interactive", f"{path}: tool_type must be 'interactive'"
+          assert root.get("id") == expected_id, f"{path}: id={root.get('id')!r}, expected {expected_id!r}"
+          containers = [c.text.strip() for c in root.findall("./requirements/container") if c.text]
+          assert len(containers) == 1, f"{path}: expected exactly one <container>, found {len(containers)}"
+          ports = [p.text.strip() for p in root.findall("./entry_points/entry_point/port") if p.text]
+          assert ports, f"{path}: no <port> declared in <entry_points>"
+          print(f"id={root.get('id')} version={root.get('version')} container={containers[0]} port={ports[0]}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"image={containers[0]}\n")
+              out.write(f"tool_id={root.get('id')}\n")
+          PY
+
+      - name: Check that the image is published
+        env:
+          IMAGE: ${{ steps.xml.outputs.image }}
+          QUAY_OAUTH_TOKEN: ${{ secrets.QUAY_OAUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          registry="${IMAGE%%/*}"
+          rest="${IMAGE#*/}"
+          repo="${rest%:*}"
+          tag="${rest##*:}"
+          if [ "$registry" != "quay.io" ]; then
+            echo "::error::$IMAGE: only quay.io images are checked by this workflow"
+            exit 1
+          fi
+          api="https://quay.io/api/v1/repository/${repo}/tag/?specificTag=${tag}&onlyActiveTags=true"
+          auth=()
+          if [ -n "${QUAY_OAUTH_TOKEN:-}" ]; then
+            auth=(-u "\$oauthtoken:${QUAY_OAUTH_TOKEN}")
+          fi
+          code=$(curl -s -o registry.json -w '%{http_code}' "${auth[@]}" "$api")
+          if [ "$code" != "200" ]; then
+            detail=$(jq -r '.error_message // .detail // "no details"' registry.json 2>/dev/null || true)
+            echo "::error::$IMAGE is not published: quay.io answered HTTP $code for ${repo}:${tag} (${detail}). Publish it first with Actions -> Container images -> Run workflow (image: ${TOOL})."
+            exit 1
+          fi
+          if [ "$(jq '.tags | length' registry.json)" -lt 1 ]; then
+            echo "::error::$IMAGE is not published: tag ${tag} does not exist on quay.io/${repo}. Publish it first with Actions -> Container images -> Run workflow (image: ${TOOL})."
+            exit 1
+          fi
+          digest=$(jq -r '.tags[0].manifest_digest' registry.json)
+          echo "Image ${IMAGE} is published (${digest})"
+
+      - name: Copy the XML into the target repository
+        id: prepare
+        env:
+          TOKEN: ${{ secrets.USEGALAXY_EU_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${TOKEN:-}" ]; then
+            url="https://x-access-token:${TOKEN}@github.com/${TARGET_REPO}.git"
+          elif [ "$DRY_RUN" = "true" ]; then
+            url="https://github.com/${TARGET_REPO}.git"
+          else
+            echo "::error::The USEGALAXY_EU_TOKEN secret is not set (needs write access to ${TARGET_REPO})"
+            exit 1
+          fi
+          git clone --depth 1 --filter=blob:none --sparse \
+            --branch "$TARGET_BRANCH" "$url" target
+          cd target
+          git sparse-checkout set tools/interactive
+          git config user.name "usegalaxy-eu bot"
+          git config user.email "devnull@usegalaxy-eu.org"
+
+          destination="tools/interactive/$(basename "$XML")"
+          cp "../$XML" "$destination"
+          git add "$destination"
+
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "${TARGET_BRANCH} already has an identical $(basename "$destination"), nothing to do"
+            exit 0
+          fi
+
+          git --no-pager diff --cached --stat
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            {
+              echo "### ${TOOL}: would open a pull request against ${TARGET_REPO}@${TARGET_BRANCH}"
+              echo
+              echo '```diff'
+              git --no-pager diff --cached
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          git checkout -b "$BRANCH"
+          git commit -m "Add the ${TOOL} interactive tool"
+          git push --force origin "$BRANCH"
+
+      - name: Open or update the pull request
+        if: steps.prepare.outputs.changed == 'true' && env.DRY_RUN != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.USEGALAXY_EU_TOKEN }}
+          TOOL_ID: ${{ steps.xml.outputs.tool_id }}
+          IMAGE: ${{ steps.xml.outputs.image }}
+        run: |
+          set -euo pipefail
+          xml_name=$(basename "$XML")
+          body=$(mktemp)
+          cat > "$body" <<EOF
+          Adds tools/interactive/${xml_name} to the interactive tools collection.
+
+          - Tool id: ${TOOL_ID}
+          - Container image: ${IMAGE} (checked to be published before this pull request was opened)
+          - Source: https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/${XML}
+
+          The XML is copied unchanged from usegalaxy-eu/microbiome-ITs by
+          .github/workflows/deploy-tool.yml in that repository.
+
+          Tool panel registration is a separate change in usegalaxy-eu/infrastructure-playbook
+          (templates/galaxy/config/tool_conf.xml.j2):
+
+              <tool file="interactive/${xml_name}" />
+          EOF
+
+          number=$(gh pr list --repo "$TARGET_REPO" --head "$BRANCH" --base "$TARGET_BRANCH" \
+            --state open --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --repo "$TARGET_REPO" --body-file "$body"
+            url=$(gh pr view "$number" --repo "$TARGET_REPO" --json url --jq .url)
+            echo "Updated pull request: $url"
+          else
+            url=$(gh pr create --repo "$TARGET_REPO" --base "$TARGET_BRANCH" --head "$BRANCH" \
+              --title "Add the ${TOOL} interactive tool" --body-file "$body")
+            echo "Opened pull request: $url"
+          fi
+          {
+            echo "### ${TOOL}"
+            echo
+            echo "$url"
+          } >> "$GITHUB_STEP_SUMMARY"

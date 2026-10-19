@@ -191,6 +191,44 @@ make push_hub USERNAME=... DOCKERHUB_PASSWORD=...
 The password can also be read from a `.password` file in the tool directory
 (gitignored). Never commit credentials.
 
+## Deploying to usegalaxy.eu
+
+Publishing the image is only half of the deployment: the Galaxy server loads the
+wrapper from its own checkout, so the XML also has to be added to
+[`usegalaxy-eu/galaxy`](https://github.com/usegalaxy-eu/galaxy) under
+`tools/interactive/`.
+
+**Actions → Deploy interactive tool to usegalaxy.eu → Run workflow** does that
+for one tool (or `all`):
+
+1. **Validate** the XML: `tool_type="interactive"`, id `interactive_tool_<tool>`,
+   exactly one container and at least one port.
+2. **Check the image is published**: the container reference from the XML is
+   looked up on quay.io. If the tag does not exist the job stops before any PR is
+   opened - a wrapper whose image is missing would only fail on the server.
+3. **Copy the XML** into `tools/interactive/` of a sparse checkout of the target
+   branch and push it as `add-it-<tool>`.
+4. **Open or update the pull request** against the target branch (default
+   `release_26.1_europe`). Re-running the workflow updates the same PR.
+
+`dry_run: true` runs steps 1-3 and prints the diff without pushing (this also
+works without credentials, since the checkout stays anonymous).
+
+The workflow needs the `USEGALAXY_EU_TOKEN` secret: a token with write access to
+`usegalaxy-eu/galaxy` (push branches and open pull requests). `QUAY_OAUTH_TOKEN`
+is optional and only used to authenticate the registry lookup.
+
+After the galaxy PR is merged, the wrapper needs a tool panel entry in
+[`usegalaxy-eu/infrastructure-playbook`](https://github.com/usegalaxy-eu/infrastructure-playbook)
+(`templates/galaxy/config/tool_conf.xml.j2`, section `interactivetools`):
+
+```xml
+<tool file="interactive/interactivetool_<tool>.xml" />
+```
+
+That is a separate repository and a separate PR; the deploy PR body repeats the
+line to add.
+
 ## Notes
 
 - Results are sent back into the user's Galaxy history rather than downloaded by
