@@ -7,6 +7,7 @@ on:
       - 'metadavis/**'
       - 'microbiomeprofiler/**'
       - 'cminet/**'
+      - 'miadash/**'
   push:
     branches:
       - main
@@ -15,6 +16,7 @@ on:
       - 'metadavis/**'
       - 'microbiomeprofiler/**'
       - 'cminet/**'
+      - 'miadash/**'
   release:
     types:
       - published
@@ -31,6 +33,7 @@ on:
           - metadavis
           - microbiomeprofiler
           - cminet
+          - miadash
       tag:
         description: Image tag to publish (the published image also gets :latest)
         required: true
@@ -48,6 +51,7 @@ jobs:
       metadavis: ${{ steps.filter.outputs.metadavis }}
       microbiomeprofiler: ${{ steps.filter.outputs.microbiomeprofiler }}
       cminet: ${{ steps.filter.outputs.cminet }}
+      miadash: ${{ steps.filter.outputs.miadash }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,6 +70,9 @@ jobs:
             cminet:
               - '.github/workflows/ci.yml'
               - 'cminet/**'
+            miadash:
+              - '.github/workflows/ci.yml'
+              - 'miadash/**'
 
   build-metadavis:
     needs: changes
@@ -92,6 +99,15 @@ jobs:
     with:
       context: cminet
       image: cminet-gxit
+      push: false
+
+  build-miadash:
+    needs: changes
+    if: needs.changes.outputs.miadash == 'true'
+    uses: ./.github/workflows/image.yml
+    with:
+      context: miadash
+      image: miadash-gxit
       push: false
 
   release-metadavis:
@@ -129,6 +145,19 @@ jobs:
     with:
       context: cminet
       image: cminet-gxit
+      push: true
+      tag: ${{ github.event.client_payload.tag || inputs.tag || github.event.release.tag_name }}
+    secrets: inherit
+
+  release-miadash:
+    if: >-
+      github.event_name == 'release' ||
+      (github.event_name == 'repository_dispatch' && github.event.client_payload.image == 'miadash') ||
+      (github.event_name == 'workflow_dispatch' && inputs.image == 'miadash')
+    uses: ./.github/workflows/image.yml
+    with:
+      context: miadash
+      image: miadash-gxit
       push: true
       tag: ${{ github.event.client_payload.tag || inputs.tag || github.event.release.tag_name }}
     secrets: inherit
