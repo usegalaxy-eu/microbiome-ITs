@@ -103,5 +103,9 @@ fi
 # Galaxy reaches the job container over a bridge IP rather than on its loopback.
 # The port comes from $PORT, which the Dockerfile sets from ARG PORT and which
 # has to match <port> in the tool XML.
+#
+# library(miaDash) before the call: miaDash() uses shiny's addResourcePath()
+# unqualified and the NAMESPACE only imports stopApp, so it needs the package
+# (and with it shiny, a Depends) attached - the way upstream documents it.
 exec R --vanilla -q -e \
-    "shiny::runApp(miaDash::miaDash(), host = '0.0.0.0', port = ${PORT}, launch.browser = FALSE)"
+    "suppressPackageStartupMessages(library(miaDash)); shiny::runApp(miaDash::miaDash(), host = '0.0.0.0', port = ${PORT}, launch.browser = FALSE)"

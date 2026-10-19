@@ -62,6 +62,10 @@ if ("iSEE" %in% app_libraries && requireNamespace("iSEE", quietly = TRUE)) {
 }
 
 cat("\n== app object\n")
+# Attached first, like upstream's documented usage: miaDash() calls shiny's
+# addResourcePath() unqualified and the NAMESPACE only imports stopApp, so the
+# call only works with the package (and shiny, a Depends) attached.
+suppressPackageStartupMessages(library(miaDash))
 app <- tryCatch(suppressMessages(miaDash::miaDash()), error = function(e) e)
 ok("miaDash::miaDash() runs", !inherits(app, "error"))
 if (inherits(app, "error")) {

@@ -264,7 +264,14 @@ if (isee_version < "2.19.4") {
 
 # The app is assembled by miaDash(), which builds the iSEE landing page object,
 # so calling it exercises the package's UI and server code without a browser.
+#
+# library(miaDash) first, deliberately: miaDash() calls shiny's
+# addResourcePath() unqualified, and the package's NAMESPACE only imports
+# stopApp from shiny. That resolves through the attached package (shiny is in
+# Depends, so library(miaDash) attaches it) - which is how upstream documents
+# and runs the app - but not through a bare miaDash::miaDash() call.
 cat("\n== verifying the app object\n")
+suppressPackageStartupMessages(library(miaDash))
 app <- tryCatch(suppressMessages(miaDash::miaDash()), error = function(e) e)
 if (inherits(app, "error")) {
     stop("miaDash::miaDash() failed: ", conditionMessage(app))
