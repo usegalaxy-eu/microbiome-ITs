@@ -132,7 +132,15 @@ normal way to publish a new image:
 | `cminet` | `quay.io/galaxy/cminet-gxit:<tag>` and `:latest` |
 | `miadash` | `quay.io/galaxy/miadash-gxit:<tag>` and `:latest` |
 
-The same happens automatically when a GitHub **release** is published.
+Leave the `tag` input **empty** and the workflow auto-increments the version
+instead: it reads the version tags already published on `quay.io/galaxy` for the
+picked image, and publishes the next patch version (`1.0.0` → `1.0.1`; ad-hoc
+tags like `v1` are understood as `1.0.0`; if no version tag exists yet it starts
+at `1.0.0`). The computed tag is shown in the `next-tag` job log.
+
+The same happens automatically when a GitHub **release** is published - that
+uses the GitHub release's tag name, and additionally the `next-tag` job computes
+the next version for reference.
 
 ### Automatic builds
 
@@ -147,7 +155,9 @@ event, which is the way to publish after changing a fork:
 {"event_type":"image-release","client_payload":{"image":"metadavis","tag":"1.0.0"}}
 ```
 
-Use `microbiomeprofiler`, `cminet` or `miadash` for those images. Sending this
+Use `microbiomeprofiler`, `cminet` or `miadash` for those images. The `tag` is
+optional - if omitted, the workflow auto-increments from the tags already
+published on quay, exactly like the manual dispatch above. Sending this
 event from another repository requires a token with permission to dispatch
 workflows in this repository.
 
