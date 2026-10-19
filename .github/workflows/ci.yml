@@ -35,9 +35,9 @@ on:
           - cminet
           - miadash
       tag:
-        description: Image tag to publish (the published image also gets :latest)
-        required: true
-        default: latest
+        description: Image tag to publish (leave empty to auto-increment the latest published version; the image also gets :latest)
+        required: false
+        default: ''
         type: string
 
 env:
@@ -110,7 +110,57 @@ jobs:
       image: miadash-gxit
       push: false
 
+  # Computes the next version tag (e.g. 1.0.0 -> 1.0.1) from the version tags
+  # already published on quay.io. Release jobs fall back to this whenever no
+  # explicit tag was requested, so publishing never clobbers an existing tag.
+  next-tag:
+    if: >-
+      github.event_name == 'release' ||
+      github.event_name == 'repository_dispatch' ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      metadavis: ${{ steps.bump.outputs.metadavis }}
+      microbiomeprofiler: ${{ steps.bump.outputs.microbiomeprofiler }}
+      cminet: ${{ steps.bump.outputs.cminet }}
+      miadash: ${{ steps.bump.outputs.miadash }}
+    steps:
+      - name: Compute next version tag per image
+        id: bump
+        env:
+          QUAY_OAUTH_TOKEN: ${{ secrets.QUAY_OAUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          auth=()
+          if [ -n "${QUAY_OAUTH_TOKEN:-}" ]; then
+            auth=(-u '$oauthtoken:'"${QUAY_OAUTH_TOKEN}")
+          fi
+          for image in metadavis microbiomeprofiler cminet miadash; do
+            tags=""
+            for page in $(seq 1 20); do
+              names=$(curl -sf "${auth[@]}" \
+                "https://quay.io/api/v1/repository/galaxy/${image}-gxit/tag/?limit=100&page=${page}&onlyActiveTags=true" \
+                | jq -r '.tags[]?.name // empty' || true)
+              [ -z "${names}" ] && break
+              tags="${tags}"$'\n'"${names}"
+            done
+            # Normalize ad-hoc version tags (v1, 1.2, v1.2.3, ...) to x.y.z
+            versions=$(grep -E '^v?[0-9]+(\.[0-9]+){0,2}$' <<< "${tags}" \
+              | sed -E 's/^v//' \
+              | awk -F. '{ printf "%d.%d.%d\n", $1, ($2 == "" ? 0 : $2), ($3 == "" ? 0 : $3) }' || true)
+            latest=$(sort -V <<< "${versions}" | tail -n 1 || true)
+            if [ -z "${latest}" ]; then
+              next="1.0.0"
+            else
+              IFS=. read -r major minor patch <<< "${latest}"
+              next="${major}.${minor}.$((patch + 1))"
+            fi
+            echo "${image}=${next}" >> "${GITHUB_OUTPUT}"
+            echo "Next tag for ${image}-gxit: ${next} (latest published version tag: ${latest:-none})"
+          done
+
   release-metadavis:
+    needs: next-tag
     if: >-
       github.event_name == 'release' ||
       (github.event_name == 'repository_dispatch' && github.event.client_payload.image == 'metadavis') ||
@@ -120,10 +170,11 @@ jobs:
       context: metadavis
       image: metadavis-gxit
       push: true
-      tag: ${{ github.event.client_payload.tag || inputs.tag || github.event.release.tag_name }}
+      tag: ${{ github.event.client_payload.tag || (github.event_name == 'release' && github.event.release.tag_name) || inputs.tag || needs.next-tag.outputs.metadavis }}
     secrets: inherit
 
   release-microbiomeprofiler:
+    needs: next-tag
     if: >-
       github.event_name == 'release' ||
       (github.event_name == 'repository_dispatch' && github.event.client_payload.image == 'microbiomeprofiler') ||
@@ -133,10 +184,11 @@ jobs:
       context: microbiomeprofiler
       image: microbiomeprofiler-gxit
       push: true
-      tag: ${{ github.event.client_payload.tag || inputs.tag || github.event.release.tag_name }}
+      tag: ${{ github.event.client_payload.tag || (github.event_name == 'release' && github.event.release.tag_name) || inputs.tag || needs.next-tag.outputs.microbiomeprofiler }}
     secrets: inherit
 
   release-cminet:
+    needs: next-tag
     if: >-
       github.event_name == 'release' ||
       (github.event_name == 'repository_dispatch' && github.event.client_payload.image == 'cminet') ||
@@ -146,10 +198,11 @@ jobs:
       context: cminet
       image: cminet-gxit
       push: true
-      tag: ${{ github.event.client_payload.tag || inputs.tag || github.event.release.tag_name }}
+      tag: ${{ github.event.client_payload.tag || (github.event_name == 'release' && github.event.release.tag_name) || inputs.tag || needs.next-tag.outputs.cminet }}
     secrets: inherit
 
   release-miadash:
+    needs: next-tag
     if: >-
       github.event_name == 'release' ||
       (github.event_name == 'repository_dispatch' && github.event.client_payload.image == 'miadash') ||
@@ -159,5 +212,5 @@ jobs:
       context: miadash
       image: miadash-gxit
       push: true
-      tag: ${{ github.event.client_payload.tag || inputs.tag || github.event.release.tag_name }}
+      tag: ${{ github.event.client_payload.tag || (github.event_name == 'release' && github.event.release.tag_name) || inputs.tag || needs.next-tag.outputs.miadash }}
     secrets: inherit
