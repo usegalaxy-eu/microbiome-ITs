@@ -137,16 +137,16 @@ startup-test:
 	echo "$$log" | grep -q "miaDash Galaxy Interactive Tool" \
 	    && echo "PASS - the startup log is written" \
 	    || { echo "FAIL - no startup log"; echo "$$log"; exit 1; }; \
-	echo "$$log" | grep -q "abundance table: /job/miadash_inputs/assay.tsv (" \
+	echo "$$log" | grep -Eq "abundance table: +/job/miadash_inputs/assay.tsv \(" \
 	    && echo "PASS - the staged abundance table is reported and exported" \
 	    || { echo "FAIL - the abundance table was not staged"; echo "$$log"; exit 1; }; \
-	echo "$$log" | grep -q "sample data:    /job/miadash_inputs/coldata.tsv (" \
+	echo "$$log" | grep -Eq "sample data: +/job/miadash_inputs/coldata.tsv \(" \
 	    && echo "PASS - the staged colData is reported and exported" \
 	    || { echo "FAIL - the colData was not staged"; echo "$$log"; exit 1; }; \
-	echo "$$log" | grep -Eq "taxa data:      <not provided" \
+	echo "$$log" | grep -Eq "taxa data: +<not provided" \
 	    && echo "PASS - an untouched optional input is reported as absent" \
 	    || { echo "FAIL - missing input not reported"; echo "$$log"; exit 1; }; \
-	echo "$$log" | grep -Eq "taxa tree:      <not provided" \
+	echo "$$log" | grep -Eq "taxa tree: +<not provided" \
 	    && echo "PASS - the untouched tree is reported as absent" \
 	    || { echo "FAIL - missing tree not reported"; echo "$$log"; exit 1; }; \
 	echo "$$log" | grep -q "Galaxy API key: missing" \
