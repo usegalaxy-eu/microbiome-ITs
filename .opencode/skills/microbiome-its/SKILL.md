@@ -162,17 +162,24 @@ curl -s -H "x-api-key: $KEY" "$BASE/api/entry_points?running=true"   # poll unti
 The image and the wrapper ship separately: quay gets the image, and
 [`usegalaxy-eu/galaxy`](https://github.com/usegalaxy-eu/galaxy) gets the XML under
 `tools/interactive/`. **Actions → Deploy interactive tool to usegalaxy.eu → Run
-workflow** does the checks and opens the PR:
+workflow** prepares the branch in a fork and prints a compare link; opening the
+PR stays manual:
 
 1. validates the XML (interactive, expected tool id, one container, one port);
 2. looks the container tag up on quay.io and **stops if the image is not
    published** - never deploy a wrapper whose image is missing;
-3. sparse-clones the target branch, copies `interactivetool_<tool>.xml` into
-   `tools/interactive/` and pushes `add-it-<tool>`;
-4. opens or updates the pull request (one per tool; pick `tool: all` to loop).
+3. extends the fork's `target_branch` with a branch `add-it-<tool>` that adds
+   `tools/interactive/interactivetool_<tool>.xml` (based on the fork's own copy of
+   the branch, so the push is one commit even if the fork is old);
+4. prints the `usegalaxy-eu/galaxy` compare URL and a ready-to-paste PR body.
 
-Needs the `USEGALAXY_EU_TOKEN` secret (write access to `usegalaxy-eu/galaxy`);
-`dry_run: true` prints the diff without credentials.
+Needs the `FORK_PUSH_TOKEN` secret (fine-grained PAT, Contents: read and write on
+the fork only); `dry_run: true` prints the diff without credentials.
+
+The fork must already have `target_branch`: create it once by re-forking or with
+`git fetch upstream <branch> && git push origin FETCH_HEAD:<branch>`. A fork that
+is behind still works (the run warns), because the PR diff is computed against the
+merge base.
 
 The tool panel entry stays manual: after the PR merges, add
 `<tool file="interactive/interactivetool_<tool>.xml" />` to
