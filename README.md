@@ -13,6 +13,19 @@ build, run and register it:
 | [`cminet/`](cminet/) | [solislemuslab/CMiNetShinyAPP](https://github.com/solislemuslab/CMiNetShinyAPP) | [paulzierep/CMiNetShinyAPP](https://github.com/paulzierep/CMiNetShinyAPP/tree/galaxy-it-adaptations) | `quay.io/galaxy/cminet-gxit` |
 | [`miadash/`](miadash/) | [microbiome/miaDash](https://github.com/microbiome/miaDash) | [paulzierep/miaDash](https://github.com/paulzierep/miaDash/tree/galaxy-it-adaptations) | `quay.io/galaxy/miadash-gxit` |
 
+> **⚠ License pending for two tools.** Neither upstream ships a license file yet,
+> which means we have no explicit permission to redistribute their code inside
+> container images. We have asked the maintainers to add one and are waiting for
+> a reply:
+>
+> - [GudaLab/MetaDAVis#1](https://github.com/GudaLab/MetaDAVis/issues/1)
+> - [YuLab-SMU/MicrobiomeProfiler#7](https://github.com/YuLab-SMU/MicrobiomeProfiler/issues/7)
+>
+> Until a license is added, treat `metadavis` and `microbiomeprofiler` as
+> **unlicensed upstream code** and do not publish their images more widely than
+> the current testing context. `cminet` (GPL-3.0) and `miadash` (Artistic-2.0)
+> are unaffected.
+
 ## Application forks
 
 This repository packages the images; it does **not** carry any application
@@ -132,7 +145,15 @@ normal way to publish a new image:
 | `cminet` | `quay.io/galaxy/cminet-gxit:<tag>` and `:latest` |
 | `miadash` | `quay.io/galaxy/miadash-gxit:<tag>` and `:latest` |
 
-The same happens automatically when a GitHub **release** is published.
+Leave the `tag` input **empty** and the workflow auto-increments the version
+instead: it reads the version tags already published on `quay.io/galaxy` for the
+picked image, and publishes the next patch version (`1.0.0` → `1.0.1`; ad-hoc
+tags like `v1` are understood as `1.0.0`; if no version tag exists yet it starts
+at `1.0.0`). The computed tag is shown in the `next-tag` job log.
+
+The same happens automatically when a GitHub **release** is published - that
+uses the GitHub release's tag name, and additionally the `next-tag` job computes
+the next version for reference.
 
 ### Automatic builds
 
@@ -147,7 +168,9 @@ event, which is the way to publish after changing a fork:
 {"event_type":"image-release","client_payload":{"image":"metadavis","tag":"1.0.0"}}
 ```
 
-Use `microbiomeprofiler`, `cminet` or `miadash` for those images. Sending this
+Use `microbiomeprofiler`, `cminet` or `miadash` for those images. The `tag` is
+optional - if omitted, the workflow auto-increments from the tags already
+published on quay, exactly like the manual dispatch above. Sending this
 event from another repository requires a token with permission to dispatch
 workflows in this repository.
 
