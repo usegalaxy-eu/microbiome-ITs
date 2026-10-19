@@ -31,7 +31,8 @@ Build and tag first (the XML `<container>` references the quay tag, so BOTH tags
 ```sh
 make docker                          # docker build -t <tool>-gxit:latest
 docker tag <tool>-gxit:latest quay.io/galaxy/<tool>-gxit:latest
-docker tag <tool>-gxit:latest quay.io/galaxy/<tool>-gxit:1.0.0   # keep in sync with Makefile IMAGE_VERSION
+# versioned tag (e.g. quay.io/galaxy/<tool>-gxit:1.0.0) is a CI release concern;
+# the workflow auto-increments it from the tags published on quay (see next-tag job)
 ```
 
 Serve a dev Galaxy against the local Galaxy checkout:
