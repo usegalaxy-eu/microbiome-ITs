@@ -13,6 +13,19 @@ build, run and register it:
 | [`cminet/`](cminet/) | [solislemuslab/CMiNetShinyAPP](https://github.com/solislemuslab/CMiNetShinyAPP) | [paulzierep/CMiNetShinyAPP](https://github.com/paulzierep/CMiNetShinyAPP/tree/galaxy-it-adaptations) | `quay.io/galaxy/cminet-gxit` |
 | [`miadash/`](miadash/) | [microbiome/miaDash](https://github.com/microbiome/miaDash) | [paulzierep/miaDash](https://github.com/paulzierep/miaDash/tree/galaxy-it-adaptations) | `quay.io/galaxy/miadash-gxit` |
 
+> **⚠ License pending for two tools.** Neither upstream ships a license file yet,
+> which means we have no explicit permission to redistribute their code inside
+> container images. We have asked the maintainers to add one and are waiting for
+> a reply:
+>
+> - [GudaLab/MetaDAVis#1](https://github.com/GudaLab/MetaDAVis/issues/1)
+> - [YuLab-SMU/MicrobiomeProfiler#7](https://github.com/YuLab-SMU/MicrobiomeProfiler/issues/7)
+>
+> Until a license is added, treat `metadavis` and `microbiomeprofiler` as
+> **unlicensed upstream code** and do not publish their images more widely than
+> the current testing context. `cminet` (GPL-3.0) and `miadash` (Artistic-2.0)
+> are unaffected.
+
 ## Application forks
 
 This repository packages the images; it does **not** carry any application
