@@ -156,13 +156,27 @@ Results are sent back into the Galaxy history rather than downloaded by hand:
 every download output in the app gets a *Send to Galaxy* button next to it (the
 fork's `galaxy-it-adaptations` branch), which re-runs the very content function
 the download button uses and uploads the byte-identical file via
-`galaxy-ie-helpers`. The tool XML declares a collection over
-`miadash_outputs/`, so sent files appear as *miaDash results* - even if the
-direct upload fails, the collection is populated when the job ends, so nothing
-sent during a session is lost.
+`galaxy-ie-helpers`. That covers the export download on the landing page and the
+download button of the iSEE export panel: the latter is iSEE's own, so its file name
+and content function are taken from the Shiny session's download registry instead
+of being re-implemented.
 
-The button injection uses an allow-list of registered output ids, so iSEE's own
+iSEE's export is one zip of every selected panel, and a zip is not a result a
+history can use: no viewer opens it and no tool can take a figure out of it. So the
+archive is unpacked on the way through and each member is sent as its own dataset -
+one PDF per figure, one CSV per table - and the zip itself is not kept. The tool XML
+declares a collection over `miadash_outputs/`, so sent files appear as *miaDash
+results* - even if the direct upload fails, the collection is populated when the job
+ends, so nothing sent during a session is lost.
+
+The button injection uses an allow-list of registered output ids, so iSEE's other
 internal download links (memory export and friends) never get a button.
+
+The upload log (`galaxy_upload.log`) is a diagnostic, not a result, so it is
+written to the job working directory and not into `miadash_outputs/`: Galaxy turns
+every file in there into a dataset of the results collection. The startup log is
+written straight into the declared `miadash_startup.txt` output dataset, so it is
+collected at the end of the session like any other output.
 
 ## Citation
 

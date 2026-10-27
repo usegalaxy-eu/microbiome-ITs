@@ -18,6 +18,11 @@
 # to copy around: the app object is built and handed to shiny::runApp(), like the
 # MicrobiomeProfiler image next door.
 #
+# MIADASH_STARTUP_LOG is the declared startup-log dataset Galaxy hands in, so the
+# log is written straight into the output instead of being copied out of the job
+# directory at the end of the session. MIADASH_LOG_DIR is the job directory: the
+# upload log is a diagnostic and must stay out of the discovered output directory.
+#
 # For a plain `docker run` the same script works, see the README.
 
 set -euo pipefail
@@ -26,10 +31,19 @@ JOB_DIR="${MIADASH_JOB_DIR:-$PWD}"
 PORT="${PORT:-8080}"
 INPUT_DIR="$JOB_DIR/miadash_inputs"
 OUTPUT_DIR="${MIADASH_OUTPUT_DIR:-$JOB_DIR/miadash_outputs}"
-STARTUP_LOG="$JOB_DIR/miadash_startup.txt"
+# The declared startup log output when the tool XML provides it (Galaxy hands
+# the dataset path in), and a file in the job directory otherwise (plain
+# `docker run`).
+STARTUP_LOG="${MIADASH_STARTUP_LOG:-$JOB_DIR/miadash_startup.txt}"
+# Where the upload log goes. Deliberately not the output directory: Galaxy turns
+# every file in there into a dataset of the results collection, and a log is not a
+# result.
+LOG_DIR="${MIADASH_LOG_DIR:-$JOB_DIR}"
 
-mkdir -p "$INPUT_DIR" "$OUTPUT_DIR"
+mkdir -p "$INPUT_DIR" "$OUTPUT_DIR" "$LOG_DIR"
+mkdir -p "$(dirname "$STARTUP_LOG")"
 export MIADASH_OUTPUT_DIR="$OUTPUT_DIR"
+export MIADASH_LOG_DIR="$LOG_DIR"
 
 # Truncated here, then appended to below, because the input report runs before
 # the log is assembled and has somewhere to say what it did.

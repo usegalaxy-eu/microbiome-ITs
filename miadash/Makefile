@@ -152,6 +152,9 @@ startup-test:
 	echo "$$log" | grep -q "Galaxy API key: missing" \
 	    && echo "PASS - Galaxy session state is reported" \
 	    || { echo "FAIL - Galaxy session state missing"; echo "$$log"; exit 1; }; \
+	test -s "$(CURDIR)/.startup-job/miadash_startup.txt" \
+	    && echo "PASS - the startup log is written to the file, not only to stdout" \
+	    || { echo "FAIL - no startup log file"; exit 1; }; \
 	rm -rf "$(CURDIR)/.startup-job"
 
 # everything that can be checked without starting the app
