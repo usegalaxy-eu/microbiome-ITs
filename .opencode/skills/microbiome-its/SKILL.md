@@ -35,6 +35,13 @@ docker tag <tool>-gxit:latest quay.io/galaxy/<tool>-gxit:latest
 # the workflow auto-increments it from the tags published on quay (see next-tag job)
 ```
 
+**Always pin the version tag in the wrapper, never `:latest`.** Every
+`<container type="docker">` in this repository names a published version tag
+(`1.0.0`, `v1`, `v0.1`, ...) and `WEB_TAG` in the tool's Makefile has to
+produce that same tag, so a running server never silently changes the image under
+a user and a rollback is a one-line edit. `:latest` is only published alongside
+it for convenience, not referenced by any wrapper.
+
 Serve a dev Galaxy against the local Galaxy checkout:
 
 ```sh
@@ -71,6 +78,11 @@ matches the calling shell itself).
 ## Fast validation without a browser
 
 - `make smoke` / `make test` — run the container standalone with test fixtures, assert on startup log + app HTTP 200 (`make check`).
+- `planemo format <tool>/gxit/` — **we always run this before pushing a wrapper.** It is
+  the canonical IUC formatting: it collapses multi-line `<param>` / `<data>` attribute
+  lists onto one long line, so a "format only" diff of a few dozen lines is expected —
+  don't hand-wrap it back afterwards. Run it after every XML edit, on every wrapper,
+  and commit the formatting either with the change or as its own commit.
 - `planemo lint <tool>/gxit/` — must be INFO/CHECK only.
 - `make startup-test` (where provided) — `MIADASH_STARTUP_ONLY=1`-style seam in the entrypoint; grep startup log with `grep -E "label: +path"` (whitespace-tolerant).
 
@@ -152,10 +164,62 @@ curl -s -H "x-api-key: $KEY" "$BASE/api/entry_points?running=true"   # poll unti
   curl -sD- -o /dev/null --resolve "$H:$P:127.0.0.1" "http://$H:$P/" \
     | grep -iE 'x-frame|content-security|set-cookie'
   ```
-- Keep the image stock and adapt in the generated runtime config from the IT
-  `<command>` (Python apps often `exec()` their config, so the config file can carry a
-  small monkey-patch). Gate the patch on the app's proxy flag so upstream defaults
-  apply elsewhere — see `libreqda/gxit/interactivetool_libreqda.xml`.
+- Keep the image stock and adapt in the generated runtime config from `<configfiles>`
+  (Python apps often `exec()` their config, so the config file can carry a small
+  monkey-patch). Gate the patch on the app's proxy flag so upstream defaults apply
+  elsewhere — see `libreqda/gxit/interactivetool_libreqda.xml`.
+
+## Review checklist (what `usegalaxy-eu/galaxy` reviewers ask for)
+
+Collected from the LibreQDA PR (#416). Expect the same comments on any new IT, so
+address them before opening the PR:
+
+- **Readable runtime config, not an inline `python3 -c` blob.** Put adaptation code
+  in `<configfiles>`:
+  ```xml
+  <configfiles>
+      <configfile name="my_config" filename="my_config.py"><![CDATA[ … ]]></configfile>
+  </configfiles>
+  <command>… exec myapp server my_config.py</command>
+  ```
+  `name=` is only the Cheetah variable (a copy in `_configs/`); **without
+  `filename=` the file is never written into the job working directory** and the app
+  starts with its defaults.
+- **The work a user does in the session must survive it.** If the app keeps its state
+  in one file (SQLite), add an optional input of that format *and* an output dataset,
+  plus a `<help>` section on how to continue next time ("should we not save the
+  sqlite?" is a review comment, not an optional nicety).
+- **Every `requires_domain="True"` gets questioned.** Only keep it when the app builds
+  root-absolute URLs and cannot be path-mounted, and say so in an XML comment (no `--`
+  inside XML comments). See the LibreQDA rationale below.
+- **`<icon src="<tool>.png"/>`** — an icon is expected on every new IT. The PNG lives
+  next to the XML (`tools/interactive/<tool>.png`), i.e. in the repo's `<tool>/gxit/`;
+  the deploy workflow copies it.
+- **`planemo format` before pushing** — we keep wrappers format-clean (see *Fast
+  validation* above); a hand-wrapped XML will be collapsed by it, so run it yourself.
+- **Citations**: prefer `<citation type="doi">…</citation>` when a DOI exists. A
+  bibtex-only citation gets flagged even when the software has no paper.
+- **Cite once, in `<citations>` only.** A hand-written "**Citation**" block in
+  `<help>` is a review comment ("this is also redundant") and the two copies drift
+  apart. Galaxy renders `<citations>` itself; keep help for usage.
+- **Check that every DOI resolves** before committing:
+  `curl -s -o /dev/null -w '%{http_code}\n' https://doi.org/<doi>` → `302`.
+  A fabricated/unpublished DOI is worse than none — the MicrobiomeProfiler wrapper
+  carried `10.21105/joss.06522` ("JOSS 2024") which doi.org reports as *not found*;
+  the real citable identifier is the Bioconductor package DOI
+  `10.18129/B9.bioc.MicrobiomeProfiler`. Look DOIs up in Crossref
+  (`api.crossref.org/works?query.bibliographic=…`) rather than trusting a bibtex
+  field.
+- When the software itself has no DOI (LibreQDA), keep a bibtex `<citation>` for the
+  software *and* add the DOI of the upstream project it derives from (Taguette,
+  `10.5281/zenodo.3964287`).
+- DOI per wrapper: cminet `10.1111/2041-210X.70198` (Methods Ecol. Evol. 2025,
+  Aghdam & Solís-Lemus), metadavis `10.1371/journal.pone.0319949`, miadash
+  `10.1093/bioadv/vbaf107` (the iSEEtree paper is miaDash's citation),
+  microbiomeprofiler `10.18129/B9.bioc.MicrobiomeProfiler`, libreqda bibtex +
+  Taguette DOI.
+- Tool panel registration (`tool_conf.xml.j2` in `infrastructure-playbook`) stays a
+  manual follow-up after merge — reviewers do not expect it in the wrapper PR.
 
 ## Deploying to usegalaxy.eu
 
@@ -194,12 +258,55 @@ The tool panel entry stays manual: after the PR merges, add
   in "behind a pre-authenticating reverse proxy" mode from a generated config
   (LibreQDA: `UNIX_SOCKET = True`, which also lets the app pre-authenticate requests).
 - **Generated config is a patch point**: LibreQDA's `main.py` `exec()`s the config
-  file, so the `<command>` writes a small shim there (SameSite cookies, cookie-free
+  file, so the `<configfiles>` entry carries the shim (SameSite cookies, cookie-free
   auth, frame headers). Gate on the proxy flag.
 - **XML comments must not contain `--`** (breaks Galaxy tool parsing), and Galaxy joins
   `<command>` CDATA lines with spaces — keep it a single logical line with `;`.
-- **Cheetah escaping**: shell variables need `\$VAR`, and quotes inside a
-  `python3 -c '…'` string are easiest as `\x27`.
+- **Cheetah escaping**: shell variables need `\$VAR`; in `<configfile>` content `#`
+  comments and docstrings pass through unchanged but `$` is interpolated, so shell `$`
+  needs `\$` there too.
+- **`requires_domain="True"` is a real requirement for LibreQDA** (and any Tornado app
+  that hardcodes `/`): it answers with root-absolute `/static/…` URLs and
+  `Location: /` redirects, and has no `X-Forwarded-Prefix` support, so in path-based
+  mode (`requires_domain="False"` → `http://localhost:<proxy>/interactivetool/ep/<id>_<token>/`)
+  every navigation escapes the entry-point prefix into the Galaxy root. Say this in an
+  XML comment instead of dropping the attribute.
+- **Keep `X_HEADERS = False`**: Taguette/LibreQDA treat `X_HEADERS` as a *required*
+  config key (`Missing required configuration variable X_HEADERS`); `False` is the
+  value, it is not something to delete when cleaning up the config.
+
+## Lessons learned (LibreQDA session database, 2026-10)
+
+- **`from_work_dir` can never work for an interactive tool.** Galaxy implements it as
+  a `cp` *appended after* the tool command in the generated job script
+  (`job/command_factory.py: __handle_work_dir_outputs`). An IT is stopped by killing
+  the container (and `exec app …` already replaced the shell), so the copy never runs:
+  the dataset stays **0 bytes** while the real file sits in
+  `job_working_directory/<n>/working/…`. Symptom in the logs: no copy line, only
+  `setting metadata externally failed … External set_meta() not called`.
+- **Write straight into the output dataset path instead.** Declare
+  `<data name="database_out" format="sqlite"/>` (no `from_work_dir`) and let the app
+  open `$database_out` (`DATABASE = 'sqlite:///' + os.path.abspath('$database_out')`).
+  Galaxy collects that file at job finish, and `set_meta` then proves it worked:
+  `GET /api/datasets/<id>` reports `file_size` and a `peek` listing the tables.
+- **Save and restore in one file**: at start `cp '$database' '$database_out'` when the
+  optional input is set, so the app's live database *is* the output dataset. Nothing is
+  copied back at the end; stopping the session is enough. Crash safety is SQLite's.
+- **Testing an IT from the API** (the state part needs no browser):
+  - start: `POST /api/tools` with `{"tool_id":…, "history_id":…, "inputs":{…}}`
+  - poll `GET /api/entry_points?job_id=<job_id>` (a JSON list;
+    `/interactivetool_entry_points/list` is HTML)
+  - stop: `DELETE /api/entry_points/<entry_id>` → job `stop` → `ok`, output collected then
+  - upload fixtures with multipart `files_0|file_data=@path` (+ `files_0|NAME`,
+    `files_0|type`); `files_0|file` is silently ignored ("No data was entered in the
+    upload form")
+  - the file-format autodetect is good enough that a `.sqlite` fixture lands as
+    `extension: sqlite`; check `state`/`extension`/`file_size` before running the tool.
+- **LibreQDA/Taguette schema facts** (useful to assert a round trip): every project,
+  document, highlight and tag lives in the single DB, `documents.contents` holds the
+  document text (so the DB alone is a complete backup), and `project_members.privileges`
+  stores the enum *name* (`ADMIN`, `MANAGE_DOCS`, `TAG`, `READ`) — needed if you ever
+  seed a fixture by hand.
 
 ## Lessons learned (miaDash port, 2026-10)
 

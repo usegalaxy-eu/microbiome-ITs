@@ -130,10 +130,11 @@ planemo serve --host 0.0.0.0 --port 8080 <tool>/gxit/
 
 Release images are pushed by GitHub Actions to **`quay.io/galaxy`**, configured by
 the single `IMAGE_REPOSITORY` value in the workflows. Each published image gets
-both the requested tag and `:latest`, because that is what the tool XMLs ask for:
+both the requested tag and `:latest`. The wrappers pin the version tag, not
+`:latest`, so a published release never changes under a running server:
 
 ```xml
-<container type="docker">quay.io/galaxy/metadavis-gxit:latest</container>
+<container type="docker">quay.io/galaxy/metadavis-gxit:1.0.0</container>
 ```
 
 The release workflow authenticates with the repository's `QUAY_OAUTH_TOKEN`

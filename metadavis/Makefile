@@ -18,7 +18,7 @@ UPSTREAM_DIR=$(DEPS_ROOT)/metadavis/MetaDAVis
 UPSTREAM_SENTINEL=$(UPSTREAM_DIR)/scripts/MaAsLin3.R
 
 # These must produce the image the tool XML asks for
-# (<container type="docker">quay.io/galaxy/metadavis-gxit:latest</container>),
+# (<container type="docker">quay.io/galaxy/metadavis-gxit:1.0.0</container>),
 # otherwise Galaxy pulls the old published image from the registry instead of
 # using the image you just built locally.
 docker_name=metadavis-gxit

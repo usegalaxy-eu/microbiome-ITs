@@ -17,7 +17,7 @@ UPSTREAM_DIR=$(DEPS_ROOT)/cminet/CMiNetShinyAPP
 UPSTREAM_SENTINEL=$(UPSTREAM_DIR)/galaxy_ie.R
 
 # These must produce the image the tool XML asks for
-# (<container type="docker">quay.io/galaxy/cminet-gxit:latest</container>),
+# (<container type="docker">quay.io/galaxy/cminet-gxit:v1</container>),
 # otherwise Galaxy pulls the old published image from the registry instead of
 # using the image you just built locally.
 docker_name=cminet-gxit
@@ -29,7 +29,7 @@ internal_port=8080
 # so publishing that same port keeps one number for everything. Change the host
 # side (e.g. 9000:$(internal_port)) if 8080 is taken locally.
 port=-p 127.0.0.1:$(internal_port):$(internal_port)
-WEB_TAG=1.0.0
+WEB_TAG=v1
 WEB_TARGET=${docker_repo}/${docker_name}:${WEB_TAG}
 WEB_LATEST=${docker_repo}/${docker_name}:latest
 

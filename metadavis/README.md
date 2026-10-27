@@ -92,7 +92,7 @@ GitHub Actions publishes release images as
 ## Register it in Galaxy
 
 1. Build the image locally, then tag it with the name the tool XML asks for
-   (`quay.io/galaxy/metadavis-gxit:latest`). `make docker` does both.
+   (`quay.io/galaxy/metadavis-gxit:1.0.0`). `make docker` does both.
 2. Copy `gxit/interactivetool_metadavis.xml` into Galaxy's `tools/interactive/`
    directory.
 3. Make sure interactive tools are enabled, e.g. in `config/galaxy.yml`:

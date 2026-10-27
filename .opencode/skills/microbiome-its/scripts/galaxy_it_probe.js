@@ -160,7 +160,14 @@ async function main() {
                 const list = await targets();
                 return (
                     list.find(
-                        (t) => t.type === "iframe" && (t.url.includes(".ep.interactivetool.") || t.url.startsWith("chrome-error://")),
+                        (t) =>
+                            t.type === "iframe" &&
+                            // domain-based entry points get their own host
+                            // (<ep>-<job>.ep.interactivetool.<host>:<port>),
+                            // path-based ones are proxied under /interactivetool/ep/
+                            (t.url.includes(".ep.interactivetool.") ||
+                                t.url.includes("/interactivetool/ep/") ||
+                                t.url.startsWith("chrome-error://")),
                     ) || null
                 );
             },
@@ -194,7 +201,13 @@ async function main() {
         if (frame) frame.close();
         if (ui) ui.close();
         chrome.kill("SIGKILL");
-        fs.rmSync(profileDir, { recursive: true, force: true });
+        try {
+            fs.rmSync(profileDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+        } catch (err) {
+            // Chrome can still be flushing its profile. Cleanup must never mask the
+            // probe result (an ENOTEMPTY here used to turn a passing run into a failure).
+            console.error("cleanup warning:", err.message);
+        }
     }
 }
 

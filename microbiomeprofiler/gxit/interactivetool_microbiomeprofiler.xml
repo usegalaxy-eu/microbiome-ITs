@@ -1,7 +1,7 @@
 <tool id="interactive_tool_microbiomeprofiler" tool_type="interactive" name="MicrobiomeProfiler" version="1.0.0">
     <description>Interactive functional enrichment analysis of microbiome data</description>
     <requirements>
-        <container type="docker">quay.io/galaxy/microbiomeprofiler-gxit:latest</container>
+        <container type="docker">quay.io/galaxy/microbiomeprofiler-gxit:1.0.0</container>
     </requirements>
     <entry_points>
         <entry_point name="MicrobiomeProfiler" requires_domain="True">
@@ -38,8 +38,7 @@
         exec R --vanilla -q -e "suppressMessages(library(MicrobiomeProfiler)) ; app <- MicrobiomeProfiler::run_MicrobiomeProfiler() ; shiny::runApp(app, host = '0.0.0.0', port = 8080, launch.browser = FALSE)"
     ]]></command>
     <inputs>
-        <param name="input_table" type="data" optional="true" format="tabular,txt" label="Identifier list"
-            help="One identifier per line. Comma-, semicolon-, and tab-separated identifiers are also accepted. The selected input type determines which application tab is preloaded."/>
+        <param name="input_table" type="data" optional="true" format="tabular,txt" label="Identifier list" help="One identifier per line. Comma-, semicolon-, and tab-separated identifiers are also accepted. The selected input type determines which application tab is preloaded."/>
         <conditional name="input_options">
             <param name="input_type" type="select" label="Identifier type">
                 <option value="taxid" selected="true">NCBI TaxIDs</option>
@@ -99,22 +98,8 @@ Supported workflows:
 to the *MicrobiomeProfiler results* collection and uploaded directly in the
 background. The collection becomes available when the interactive job ends,
 even if direct upload is unavailable.
-
-.. class:: infomark
-
-**Citation**
-
-Yu G (2024). MicrobiomeProfiler: An R package for microbiome functional
-enrichment analysis. Journal of Open Source Software.
 ]]></help>
     <citations>
-        <citation type="bibtex">@misc{yu2024microbiomeprofiler,
-            author       = {Yu, Guangchuang},
-            title        = {MicrobiomeProfiler: An R package for microbiome functional enrichment analysis},
-            year         = {2024},
-            journal      = {Journal of Open Source Software},
-            publisher    = {The Open Journal},
-            doi          = {10.21105/joss.06522}
-        }</citation>
+        <citation type="doi">10.18129/B9.bioc.MicrobiomeProfiler</citation>
     </citations>
 </tool>

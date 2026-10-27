@@ -8,13 +8,13 @@ UPSTREAM_IMAGE=phunudes/libreqda
 upstream_version=1.2.1
 
 # These must produce the image the tool XML asks for
-# (<container type="docker">quay.io/galaxy/libreqda-gxit:latest</container>).
+# (<container type="docker">quay.io/galaxy/libreqda-gxit:v0.1</container>).
 docker_name=libreqda-gxit
 docker_repo=quay.io/galaxy
 # Must match <port> in gxit/interactivetool_libreqda.xml (upstream's default).
 internal_port=7465
 port=-p 127.0.0.1:$(internal_port):$(internal_port)
-WEB_TAG=$(upstream_version)
+WEB_TAG=v0.1
 WEB_TARGET=${docker_repo}/${docker_name}:${WEB_TAG}
 WEB_LATEST=${docker_repo}/${docker_name}:latest
 

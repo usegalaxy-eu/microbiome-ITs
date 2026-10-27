@@ -111,7 +111,8 @@ cannot work without an API key.
 
 ## Register it in Galaxy
 
-1. `make docker` (builds and tags `quay.io/galaxy/miadash-gxit:latest`).
+1. `make docker` (builds and tags `quay.io/galaxy/miadash-gxit:1.0.1`, the
+tag the tool XML asks for, plus `:latest`).
 2. Copy `gxit/interactivetool_miadash.xml` into Galaxy's `tools/interactive/`
    directory.
 3. Enable interactive tools in `config/galaxy.yml`:
@@ -129,7 +130,7 @@ The port in `<entry_point>` (8080) matches `ARG PORT` in the Dockerfile and
 
 | | |
 |---|---|
-| Container | `quay.io/galaxy/miadash-gxit:latest` |
+| Container | `quay.io/galaxy/miadash-gxit:1.0.1` |
 | Port | 8080 |
 | Inputs | abundance table, sample data (colData), taxa data (rowData), Newick tree - all optional, plus the "derive taxa from row names" switch |
 | Outputs | `miadash_startup.txt` plus a *miaDash results* collection |

@@ -198,6 +198,14 @@ jobs:
           cp "../$XML" "$destination"
           git add "$destination"
 
+          # Tool panel icons live next to the wrapper in tools/interactive/.
+          # Every PNG in the tool's gxit directory is copied along with it.
+          for asset in "../$(dirname "$XML")"/*.png; do
+            [ -e "$asset" ] || continue
+            cp "$asset" "tools/interactive/$(basename "$asset")"
+            git add "tools/interactive/$(basename "$asset")"
+          done
+
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "${BRANCH} already contains an identical $(basename "$destination"), nothing to do"

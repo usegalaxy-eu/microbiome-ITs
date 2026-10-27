@@ -102,7 +102,7 @@ collection via a send-to-Galaxy handler like the other tools use.
 ## Build and run
 
 ```bash
-make docker    # pulls phunudes/libreqda:1.2.1, retags as quay.io/galaxy/libreqda-gxit:{<version>,latest}
+make docker    # pulls phunudes/libreqda:1.2.1, retags as quay.io/galaxy/libreqda-gxit:{v0.1,latest}
 make check     # starts the container and polls http://127.0.0.1:7465/ for HTTP 200
 make it        # interactive run on http://127.0.0.1:7465
 ```

@@ -17,9 +17,10 @@ UPSTREAM_DIR=$(DEPS_ROOT)/miadash/miaDash
 UPSTREAM_SENTINEL=$(UPSTREAM_DIR)/R/galaxy_ie.R
 
 # These must produce the image the tool XML asks for
-# (<container type="docker">quay.io/galaxy/miadash-gxit:latest</container>),
+# (<container type="docker">quay.io/galaxy/miadash-gxit:1.0.1</container>),
 # otherwise Galaxy pulls the old published image from the registry instead of
-# using the image you just built locally.
+# using the image you just built locally. Both tags are produced: the pinned one
+# and :latest.
 docker_name=miadash-gxit
 docker_repo=quay.io/galaxy
 # Must match <port> in gxit/interactivetool_miadash.xml and ARG PORT in the

@@ -1,7 +1,7 @@
 <tool id="interactive_tool_metadavis" tool_type="interactive" name="MetaDAVis" version="1.0.0">
     <description>Interactive analysis and visualization of 16S and whole-metagenome sequencing results</description>
     <requirements>
-        <container type="docker">quay.io/galaxy/metadavis-gxit:latest</container>
+        <container type="docker">quay.io/galaxy/metadavis-gxit:1.0.0</container>
     </requirements>
     <entry_points>
         <entry_point name="MetaDAVis" requires_domain="True">
@@ -41,18 +41,13 @@
         exec /usr/local/bin/metadavis-entrypoint
     ]]></command>
     <inputs>
-        <param name="otu_table" type="data" format="tabular,csv" optional="true" label="OTU / feature table (optional)"
-            help="Feature count table in phyloseq layout: features (OTUs, ASVs or other features) in the rows, the first column holding the feature id, and one column per sample. Tab or comma separated, the separator is detected from the header."/>
-        <param name="taxonomy_table" type="data" format="tabular,csv" optional="true" label="Taxonomy table (optional)"
-            help="Taxonomy assignment for the features of the OTU table: features in the rows, the first column holding the same feature ids, and one column per taxonomic rank (Kingdom to Species). Rank prefixes such as d__ or p__ are stripped. Features missing from this table are reported as Unclassified."/>
-        <param name="metadata_table" type="data" format="tabular,csv" optional="true" label="Sample metadata (optional)"
-            help="Sample annotations: the first column holds the sample ids, which have to match the sample columns of the OTU table. The column picked below is used as the condition/group for the comparisons."/>
-        <param name="condition_column" use_header_names="true" type="data_column" data_ref="metadata_table" optional="true" label="Grouping condition column (optional)"
-            help="Column of the sample metadata holding the grouping condition. Samples are grouped by this column in all comparisons. The application only ever works with two metadata columns, the sample ids and this one, so the table is reduced to those before the analysis: any further annotation columns are dropped. Pick the second column if your metadata is the usual sample id plus condition layout; leaving this empty does the same."/>
+        <param name="otu_table" type="data" format="tabular,csv" optional="true" label="OTU / feature table (optional)" help="Feature count table in phyloseq layout: features (OTUs, ASVs or other features) in the rows, the first column holding the feature id, and one column per sample. Tab or comma separated, the separator is detected from the header."/>
+        <param name="taxonomy_table" type="data" format="tabular,csv" optional="true" label="Taxonomy table (optional)" help="Taxonomy assignment for the features of the OTU table: features in the rows, the first column holding the same feature ids, and one column per taxonomic rank (Kingdom to Species). Rank prefixes such as d__ or p__ are stripped. Features missing from this table are reported as Unclassified."/>
+        <param name="metadata_table" type="data" format="tabular,csv" optional="true" label="Sample metadata (optional)" help="Sample annotations: the first column holds the sample ids, which have to match the sample columns of the OTU table. The column picked below is used as the condition/group for the comparisons."/>
+        <param name="condition_column" use_header_names="true" type="data_column" data_ref="metadata_table" optional="true" label="Grouping condition column (optional)" help="Column of the sample metadata holding the grouping condition. Samples are grouped by this column in all comparisons. The application only ever works with two metadata columns, the sample ids and this one, so the table is reduced to those before the analysis: any further annotation columns are dropped. Pick the second column if your metadata is the usual sample id plus condition layout; leaving this empty does the same."/>
     </inputs>
     <outputs>
-        <data name="startup_log" format="txt" from_work_dir="metadavis_startup.txt"
-            label="MetaDAVis startup information"/>
+        <data name="startup_log" format="txt" from_work_dir="metadavis_startup.txt" label="MetaDAVis startup information"/>
         <collection name="output_collection" type="list" label="MetaDAVis results">
             <discover_datasets pattern="__designation_and_ext__" directory="metadavis_outputs" visible="false"/>
         </collection>
@@ -94,13 +89,6 @@ What this tool provides:
 #. Differential abundance for two-group and multi-group comparisons
    (Wilcoxon, t-test, metagenomeSeq, DESeq2, LEfSe, MaAsLin3, limma-voom, edgeR,
    Kruskal-Wallis, ANOVA)
-
-.. class:: infomark
-
-**Citation**
-
-Jagadesan S, Guda C (2025) MetaDAVis: An R shiny application for metagenomic data
-analysis and visualization. PLoS ONE 20(4): e0319949.
 ]]></help>
     <citations>
         <citation type="doi">10.1371/journal.pone.0319949</citation>

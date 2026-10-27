@@ -2,7 +2,7 @@
     <description>Interactive dashboard for the analysis and exploration of microbiome data</description>
     <icon src="miadash.png"/>
     <requirements>
-        <container type="docker">quay.io/galaxy/miadash-gxit:latest</container>
+        <container type="docker">quay.io/galaxy/miadash-gxit:1.0.1</container>
     </requirements>
     <entry_points>
         <entry_point name="miaDash" requires_domain="True">

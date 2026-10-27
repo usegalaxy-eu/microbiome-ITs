@@ -72,7 +72,8 @@ make stop
 
 ## Register it in Galaxy
 
-1. `make docker` (builds and tags `quay.io/galaxy/microbiomeprofiler-gxit:latest`).
+1. `make docker` (builds and tags `quay.io/galaxy/microbiomeprofiler-gxit:1.0.0`,
+the tag the tool XML asks for, plus `:latest`).
 2. Copy `gxit/interactivetool_microbiomeprofiler.xml` into Galaxy's
    `tools/interactive/` directory.
 3. Enable interactive tools in `config/galaxy.yml`:

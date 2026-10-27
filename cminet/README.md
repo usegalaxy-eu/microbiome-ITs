@@ -79,7 +79,7 @@ API key, so offering them outside Galaxy would only produce errors.
 
 | | |
 |---|---|
-| Container | `quay.io/galaxy/cminet-gxit:latest` |
+| Container | `quay.io/galaxy/cminet-gxit:v1` |
 | Port | 8080 |
 | Input | abundance matrix (required), weighted network (optional) |
 | Outputs | `cminet_startup.txt` plus a *CMiNet results* collection |
