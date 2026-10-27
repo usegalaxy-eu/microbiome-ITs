@@ -8,8 +8,8 @@ build, run and register it:
 
 | Directory | App (upstream) | Fork @ `galaxy-it-adaptations` | Container image |
 | --- | --- | --- | --- |
-| [`metadavis/`](metadavis/) | [GudaLab/MetaDAVis](https://github.com/GudaLab/MetaDAVis) | [paulzierep/MetaDAVis](https://github.com/paulzierep/MetaDAVis/tree/galaxy-it-adaptations) | `quay.io/galaxy/metadavis-gxit` |
-| [`microbiomeprofiler/`](microbiomeprofiler/) | [YuLab-SMU/MicrobiomeProfiler](https://github.com/YuLab-SMU/MicrobiomeProfiler) | [paulzierep/MicrobiomeProfiler](https://github.com/paulzierep/MicrobiomeProfiler/tree/galaxy-it-adaptations) | `quay.io/galaxy/microbiomeprofiler-gxit` |
+| [`metadavis/`](metadavis/) | [GudaLab/MetaDAVis](https://github.com/GudaLab/MetaDAVis) | [paulzierep/MetaDAVis](https://github.com/paulzierep/MetaDAVis/tree/galaxy-it-adaptations) |  |
+| [`microbiomeprofiler/`](microbiomeprofiler/) | [YuLab-SMU/MicrobiomeProfiler](https://github.com/YuLab-SMU/MicrobiomeProfiler) | [paulzierep/MicrobiomeProfiler](https://github.com/paulzierep/MicrobiomeProfiler/tree/galaxy-it-adaptations) |  |
 | [`cminet/`](cminet/) | [solislemuslab/CMiNetShinyAPP](https://github.com/solislemuslab/CMiNetShinyAPP) | [paulzierep/CMiNetShinyAPP](https://github.com/paulzierep/CMiNetShinyAPP/tree/galaxy-it-adaptations) | `quay.io/galaxy/cminet-gxit` |
 | [`miadash/`](miadash/) | [microbiome/miaDash](https://github.com/microbiome/miaDash) | [paulzierep/miaDash](https://github.com/paulzierep/miaDash/tree/galaxy-it-adaptations) | `quay.io/galaxy/miadash-gxit` |
 | [`libreqda/`](libreqda/) | [bin-cirst/libreqda/libre-qda](https://gitlab.com/bin-cirst/libreqda/libre-qda) | *none - used as-is from upstream's own image* | `quay.io/galaxy/libreqda-gxit` |
