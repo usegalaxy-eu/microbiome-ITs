@@ -1,4 +1,4 @@
-<tool id="interactive_tool_miadash" tool_type="interactive" name="miaDash" version="1.0.0">
+<tool id="interactive_tool_miadash" tool_type="interactive" name="miaDash" version="1.0.1">
     <description>Interactive dashboard for the analysis and exploration of microbiome data</description>
     <icon src="miadash.png"/>
     <requirements>

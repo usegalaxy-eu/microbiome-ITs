@@ -29,7 +29,7 @@ internal_port=8080
 # so publishing that same port keeps one number for everything. Change the host
 # side (e.g. 9000:$(internal_port)) if 8080 is taken locally.
 port=-p 127.0.0.1:$(internal_port):$(internal_port)
-WEB_TAG=1.0.0
+WEB_TAG=1.0.1
 WEB_TARGET=${docker_repo}/${docker_name}:${WEB_TAG}
 WEB_LATEST=${docker_repo}/${docker_name}:latest
 
