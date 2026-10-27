@@ -64,7 +64,10 @@ RUN MICROBIOMEPROFILER_DEPS_ONLY=1 Rscript --vanilla /tmp/install.R
 ARG APP_SOURCE=/opt/src/MicrobiomeProfiler
 ARG APP_REPOSITORY=https://github.com/paulzierep/MicrobiomeProfiler.git
 ARG APP_REF=galaxy-it-adaptations
-ARG CACHE_BUSTER
+# Needs a default: the RUN below is `set -eu`, so an unset CACHE_BUSTER aborts the
+# build ("CACHE_BUSTER: parameter not set") whenever the caller passes no
+# --build-arg, which is exactly what CI does.
+ARG CACHE_BUSTER=
 ARG APP_REVISION=branch
 RUN set -eux; \
     echo "CB=$CACHE_BUSTER"; \
