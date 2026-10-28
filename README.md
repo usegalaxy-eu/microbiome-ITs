@@ -13,6 +13,7 @@ build, run and register it:
 | [`cminet/`](cminet/) | [solislemuslab/CMiNetShinyAPP](https://github.com/solislemuslab/CMiNetShinyAPP) | [paulzierep/CMiNetShinyAPP](https://github.com/paulzierep/CMiNetShinyAPP/tree/galaxy-it-adaptations) | `quay.io/galaxy/cminet-gxit` |
 | [`miadash/`](miadash/) | [microbiome/miaDash](https://github.com/microbiome/miaDash) | [paulzierep/miaDash](https://github.com/paulzierep/miaDash/tree/galaxy-it-adaptations) | `quay.io/galaxy/miadash-gxit` |
 | [`libreqda/`](libreqda/) | [bin-cirst/libreqda/libre-qda](https://gitlab.com/bin-cirst/libreqda/libre-qda) | *none - used as-is from upstream's own image* | `quay.io/galaxy/libreqda-gxit` |
+| [`holomics/`](holomics/) | [MolinLab/Holomics](https://github.com/MolinLab/Holomics) | [paulzierep/Holomics](https://github.com/paulzierep/Holomics/tree/galaxy-it-adaptations) | `quay.io/galaxy/holomics-gxit` (local baseline; not yet published) |
 
 > **⚠ License pending for two tools.** Neither upstream ships a license file yet,
 > which means we have no explicit permission to redistribute their code inside

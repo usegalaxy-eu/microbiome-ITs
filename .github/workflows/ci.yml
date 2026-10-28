@@ -9,6 +9,7 @@ on:
       - 'cminet/**'
       - 'miadash/**'
       - 'libreqda/**'
+      - 'holomics/**'
   push:
     branches:
       - main
@@ -19,6 +20,7 @@ on:
       - 'cminet/**'
       - 'miadash/**'
       - 'libreqda/**'
+      - 'holomics/**'
   release:
     types:
       - published
@@ -37,6 +39,7 @@ on:
           - cminet
           - miadash
           - libreqda
+          - holomics
       tag:
         description: Image tag to publish (leave empty to auto-increment the latest published version; the image also gets :latest)
         required: false
@@ -56,6 +59,7 @@ jobs:
       cminet: ${{ steps.filter.outputs.cminet }}
       miadash: ${{ steps.filter.outputs.miadash }}
       libreqda: ${{ steps.filter.outputs.libreqda }}
+      holomics: ${{ steps.filter.outputs.holomics }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -80,6 +84,18 @@ jobs:
             libreqda:
               - '.github/workflows/ci.yml'
               - 'libreqda/**'
+            holomics:
+              - '.github/workflows/ci.yml'
+              - 'holomics/**'
+
+  build-holomics:
+    needs: changes
+    if: needs.changes.outputs.holomics == 'true'
+    uses: ./.github/workflows/image.yml
+    with:
+      context: holomics
+      image: holomics-gxit
+      push: false
 
   build-metadavis:
     needs: changes
@@ -141,6 +157,7 @@ jobs:
       cminet: ${{ steps.bump.outputs.cminet }}
       miadash: ${{ steps.bump.outputs.miadash }}
       libreqda: ${{ steps.bump.outputs.libreqda }}
+      holomics: ${{ steps.bump.outputs.holomics }}
     steps:
       - name: Compute next version tag per image
         id: bump
@@ -152,7 +169,7 @@ jobs:
           if [ -n "${QUAY_OAUTH_TOKEN:-}" ]; then
             auth=(-u '$oauthtoken:'"${QUAY_OAUTH_TOKEN}")
           fi
-          for image in metadavis microbiomeprofiler cminet miadash libreqda; do
+          for image in metadavis microbiomeprofiler cminet miadash libreqda holomics; do
             tags=""
             for page in $(seq 1 20); do
               names=$(curl -sf "${auth[@]}" \
@@ -244,4 +261,18 @@ jobs:
       image: libreqda-gxit
       push: true
       tag: ${{ github.event.client_payload.tag || (github.event_name == 'release' && github.event.release.tag_name) || inputs.tag || needs.next-tag.outputs.libreqda }}
+    secrets: inherit
+
+  release-holomics:
+    needs: next-tag
+    if: >-
+      github.event_name == 'release' ||
+      (github.event_name == 'repository_dispatch' && github.event.client_payload.image == 'holomics') ||
+      (github.event_name == 'workflow_dispatch' && inputs.image == 'holomics')
+    uses: ./.github/workflows/image.yml
+    with:
+      context: holomics
+      image: holomics-gxit
+      push: true
+      tag: ${{ github.event.client_payload.tag || (github.event_name == 'release' && github.event.release.tag_name) || inputs.tag || needs.next-tag.outputs.holomics }}
     secrets: inherit

@@ -1,0 +1,126 @@
+<tool id="interactive_tool_holomics" tool_type="interactive" name="Holomics" version="1.0.0" profile="25.0">
+    <description>Interactive single- and multi-omics analysis with mixOmics</description>
+    <icon src="holomics.png"/>
+    <requirements>
+        <container type="docker">quay.io/galaxy/holomics-gxit:1.0.0</container>
+    </requirements>
+    <entry_points>
+        <entry_point name="Holomics" requires_domain="False">
+            <port>8080</port>
+        </entry_point>
+    </entry_points>
+    <environment_variables>
+        <environment_variable name="PORT">8080</environment_variable>
+        <environment_variable name="HISTORY_ID">$__history_id__</environment_variable>
+        <environment_variable name="GALAXY_URL">$__galaxy_url__</environment_variable>
+        <environment_variable name="GALAXY_WEB_PORT">${$__galaxy_url__.split("://")[-1].split("/")[0].split(":")[-1] if ":" in $__galaxy_url__.split("://")[-1].split("/")[0] else ("443" if $__galaxy_url__.startswith("https") else "80")}</environment_variable>
+        <environment_variable name="API_KEY" inject="api_key"/>
+    </environment_variables>
+    <command detect_errors="exit_code"><![CDATA[
+        mkdir -p holomics_inputs &&
+        cp '$manifest' holomics_inputs/manifest.json &&
+        export HOLOMICS_STARTUP_LOG='$startup_log' &&
+        exec /usr/local/bin/holomics-entrypoint
+    ]]></command>
+    <configfiles>
+        <configfile name="manifest"><![CDATA[
+#import json
+#set $entries = []
+#for $block in $blocks
+#set $entry = {"name": str($block.block_name), "filename": str($block.matrix.name), "path": str($block.matrix), "separator": str($block.separator), "transpose": str($block.transpose) == "true", "prepared": str($block.prepared) == "true"}
+#silent $entries.append($entry)
+#end for
+#set $label_entry = None
+#if $labels
+#set $label_entry = {"path": str($labels), "separator": str($label_separator)}
+#end if
+$json.dumps({"blocks": $entries, "labels": $label_entry})
+        ]]></configfile>
+    </configfiles>
+    <inputs>
+        <repeat name="blocks" title="Omics block" min="0">
+            <param name="block_name" type="text" value="Omics" label="Unique block name">
+                <validator type="regex">^[a-zA-Z0-9_ ]+$</validator>
+            </param>
+            <param name="matrix" type="data" format="tabular,csv,txt" label="Numeric feature table" help="First column: sample IDs. Header: feature IDs. Normalize measurements appropriately before import."/>
+            <param name="separator" type="select" label="Table separator">
+                <option value="tab" selected="true">Tab</option>
+                <option value="comma">Comma</option>
+                <option value="semicolon">Semicolon</option>
+            </param>
+            <param name="transpose" type="boolean" checked="false" label="Features in rows, samples in columns"/>
+            <param name="prepared" type="boolean" checked="false" label="Already prepared for direct multi-omics analysis" help="Also makes this block available to pairwise sPLS and DIABLO. No normalization or filtering is applied during Galaxy import. Otherwise use the original single-omics reduction first."/>
+        </repeat>
+        <param name="labels" type="data" format="tabular,csv,txt" optional="true" label="Sample labels" help="Exactly two columns: sample ID and categorical class. IDs must match all omics tables."/>
+        <param name="label_separator" type="select" label="Labels separator">
+            <option value="tab" selected="true">Tab</option>
+            <option value="comma">Comma</option>
+            <option value="semicolon">Semicolon</option>
+        </param>
+    </inputs>
+    <outputs>
+        <data name="startup_log" format="txt" label="Holomics startup information"/>
+        <collection name="results" type="list" label="Holomics results">
+            <discover_datasets pattern="__designation_and_ext__" directory="holomics_outputs" visible="false"/>
+        </collection>
+    </outputs>
+    <help format="markdown"><![CDATA[
+**Holomics**, developed by the original Holomics authors, provides PCA, PLS-DA,
+sparse feature selection, pairwise sPLS and DIABLO integration in a Shiny app.
+The original interface and analysis workflows are unchanged.
+
+Select named omics tables and matching sample labels from your Galaxy history
+on the launch form. They load automatically into the original application.
+Tables must have identical sample sets; rows are aligned by sample ID without
+silently dropping samples. All launch inputs are optional, so the original
+**Upload data** tab remains available. Supply numeric feature tables, not raw reads.
+Mark prepared blocks to use them directly for sPLS and DIABLO; otherwise first
+reduce them through the original single-omics workflow.
+
+**Exports:** each result has separate **Download** and **Send to Galaxy** buttons.
+Download saves only to your browser. Send to Galaxy uploads only to the current history.
+Results are also staged in a collection collected when the session stops;
+this is the fallback if the live upload fails. Wait for uploads before stopping
+the interactive tool. No project checkpoints or extra analysis modules are added.
+
+Statistical methods and validation are those of the original application.
+Exploratory separation plots are not independent predictive validation.
+
+### Step-by-step two-omics example
+
+1. Upload two numeric tables and a labels table to Galaxy. Example names:
+   `Transcriptomics.csv`, `Proteomics.csv`, `Labels.csv`. The omics tables have
+   samples in rows, features in columns, headers, and sample IDs in column one.
+   Labels have exactly two columns: sample ID and class. All files must describe
+   the same sample set. Normalize measurements appropriately before analysis.
+2. Add two **Omics block** entries on this launch form. Name them
+   **Transcriptomics** and **Proteomics**, and select their respective tables.
+   For CSV examples select **Comma**. Leave transpose unchecked when samples
+   are rows. For already prepared example data, check **Already prepared for
+   direct multi-omics analysis** on both blocks.
+3. Select `Labels.csv` under **Sample labels** and **Comma** as its separator.
+   Run the tool, then open Holomics from Galaxy's Active Interactive Tools page.
+4. In **Upload data**, confirm both blocks are listed; switch to **Labels/Classes**
+   to confirm **Galaxy labels**. Inputs are loaded automatically: do not upload
+   Galaxy's internal `.dat` files again.
+5. Optionally explore each block under **Single-omics → PCA**, selecting
+   **Galaxy labels**. For unprepared data, use the original feature-selection
+   workflow first, then select the resulting reduced blocks for integration.
+6. Open **Multi-omics**. Select both blocks and **Galaxy labels**. Start with
+   two components (where supported) and the app's suggested design matrix value.
+7. Inspect pairwise correlations, sample plots, loadings and heatmaps. Click
+   **Tune parameters**, wait for **DIABLO tuned**, then compare its settings,
+   error rates and plots with the initial model. Do not change inputs while tuning.
+8. Click **Download** to save a result locally, or **Send to Galaxy** to export
+   it to your history. Wait for the Galaxy dataset to reach `ok` before stopping
+   the interactive session. The collected results collection is a fallback.
+
+Use **Pairwise** for two-block sPLS instead of class-guided DIABLO. Do not treat
+an original block and its reduced copy as two independent omics layers. Demo
+separation is exploratory, not an independently validated prediction result.
+    ]]></help>
+    <citations>
+        <citation type="doi">10.1186/s12859-024-05719-4</citation>
+        <citation type="doi">10.1371/journal.pcbi.1005752</citation>
+    </citations>
+</tool>
